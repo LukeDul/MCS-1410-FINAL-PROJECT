@@ -22,7 +22,7 @@
       num))
 
 
-; Player, Key -> Structure
+; Structure, Key -> Structure 
 ; Given a key, input-key, and player structure returns the structure with the player's heading altered based upon input-key.
 (define (key-handler struct input-key)
  (local
@@ -40,4 +40,10 @@
        (make-player
         (bind (+ heading RATE-OF-CHANGE)) ; angles player to the right
         x
-        y)]))) 
+        y)])))
+
+
+; Player Structure -> Player Structure
+; Given a Player Structure, struct, returns the Player structure with its coordinates altered, based upon its heading.  
+(define (tock struct)...)
+  
