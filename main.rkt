@@ -31,19 +31,21 @@
      (define y (player-y struct))]
  
     (cond
-      [(key=? input-key "a")
+      [(key=? input-key "a") ; if a is pressed 
        (make-player
         (bind (- heading RATE-OF-CHANGE)) ; angles player to the left
         x
-        y)] 
-      [(key=? input-key "d")
+        y)] ; note x and y are unchanged
+      
+      [(key=? input-key "d") ; if d is pressed 
        (make-player
         (bind (+ heading RATE-OF-CHANGE)) ; angles player to the right
         x
-        y)])))
+        y)]))) ; note x and y are unchanged
 
 
 ; Player Structure -> Player Structure
-; Given a Player Structure, struct, returns the Player structure with its coordinates altered, based upon its heading.  
+; Given a Player Structure, struct, returns the Player structure with its coordinates altered, based upon its heading.
+; Tock runs every tick (~25 ticks per second)
 (define (tock struct)...)
   
