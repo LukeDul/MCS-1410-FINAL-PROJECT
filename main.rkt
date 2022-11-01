@@ -8,14 +8,36 @@
 ; SPEED determines how many pixels the PLAYER moves per tick 
 (define SPEED 4)
 
-
-; heading indicates the direction the PLAYER moves 
-(define-struct heading (x y))
-
 ; player contains the coordinates and heading of the player
+; the heading is the amount by which x will change 
 (define-struct player (heading x y))
 
 
-; Structure, Key -> Structure
-; given a key and player, returns the structure with the player's heading altered based upon the key 
-(define (key-handler struct input-key)...)
+; Number -> Number
+; Given a Number, num, returns zero if num is greater than SPEED, otherwise returns num. 
+; Ensures the heading never escapes the bounds of SPEED.
+(define (bind num)
+  (if (> num SPEED)
+      0
+      num))
+
+
+; Player, Key -> Structure
+; Given a key, input-key, and player structure returns the structure with the player's heading altered based upon input-key.
+(define (key-handler struct input-key)
+ (local
+    [(define heading (player-heading struct))
+     (define x (player-x struct))
+     (define y (player-y struct))]
+ 
+    (cond
+      [(key=? input-key "a")
+       (make-player
+        (bind (- heading RATE-OF-CHANGE)) ; angles player to the left
+        x
+        y)] 
+      [(key=? input-key "d")
+       (make-player
+        (bind (+ heading RATE-OF-CHANGE)) ; angles player to the right
+        x
+        y)]))) 
