@@ -1,74 +1,88 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
 #reader(lib "htdp-advanced-reader.ss" "lang")((modname main) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #t #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp")) #f)))
-; RATE-OF-CHANGE is rate of change of the heading. 
-(define RATE-OF-CHANGE 1)
-
-; MOVE-DISTANCE is how many pixels the PLAYER moves per tick.
-(define MOVE-DISTANCE 10)
-
-; Player contains the coordinates and heading of the playable character.
-; The heading is the direction & amount that the playable character will move on the x-axis.
-; Note: the direction & amount that the player moves on the y-axis is derived from the heading with the function f(x) = MOVE-DISTANCE - |x|.
-(define-struct player (x-heading y-heading x y))
-
+om
 ; the width of the window 
 (define WINDOW-WIDTH 500)
 
 ; the height of the window 
 (define WINDOW-HEIGHT 500)
 
+; The cardinal, intercardinal, and secondary-intercardinal directions the player can move.  
+(define directions (N NE E SE S SW W NW))
 
-; Number -> Number
-; Given a Number, num, returns zero if num is greater than MOVE-DISTANCE, otherwise returns num. 
-; Ensures the heading never escapes the bounds of MOVE-DISTANCE.
-(define (bind num)
-  (if (> (abs num) MOVE-DISTANCE)
-      0
-      num))
+; player contains the heading, position & speed of the player character. 
+; heading can be any one of the compass directions
+(define-struct player [heading posn speed])
+
+; holds the state of each usuable key 
+(define-struct keyboard [w a s d])
 
 
 ; Structure, Key -> Structure 
-; Given a key, input-key, and player structure returns the structure with the player's heading altered based upon input-key.
+; sets key to true when pressed 
 (define (key-handler struct input-key)
- (local ; local definitions for readability  
-    [(define x-heading (player-x-heading struct))
-     (define y-heading (player-y-heading struct))
-     (define x (player-x struct))
-     (define y (player-y struct))]
- 
-    (cond
-      [(key=? input-key "a") ; if a is pressed 
-       (make-player
-        (bind (- x-heading RATE-OF-CHANGE))
-        (bind (- MOVE-DISTANCE (abs (- x-heading RATE-OF-CHANGE)))); angles player to the left
-        x
-        y)] ; note: x and y are unchanged
-      
-      [(key=? input-key "d") ; if d is pressed 
-       (make-player
-        (bind (+ x-heading RATE-OF-CHANGE))
-        (bind (- MOVE-DISTANCE (abs (+ x-heading RATE-OF-CHANGE)))); angles player to the right
-        x
-        y)]
-      [else struct]))) ; note: x and y are unchanged
+ (local [(define w (keyboard-w struct))
+         (define a (keyboard-a struct))
+         (define s (keyboard-s struct))
+         (define d (keyboard-d struct))]
+   (cond [(key=? input-key "w") (make-keyboard #t a s d)]
+         [(key=? input-key "a") (make-keyboard w #t s d)]
+         [(key=? input-key "s") (make-keyboard w a #t d)]   
+         [(key=? input-key "d") (make-keyboard w a s #t)])))
+
+
+; Structure, Key -> Structure 
+; sets key to false when released
+(define (release-handler struct input-key)
+ (local [(define w (keyboard-w struct))
+         (define a (keyboard-a struct))
+         (define s (keyboard-s struct))
+         (define d (keyboard-d struct))]
+   (cond [(key=? input-key "w") (make-keyboard #f a s d)]
+         [(key=? input-key "a") (make-keyboard w #f s d)]
+         [(key=? input-key "s") (make-keyboard w a #f d)]   
+         [(k y=? input-key "d") (make-keyboard w a s #f)])))
+
+
+; Keyboard Structure -> Player Structure
+; changes the heading based upon which keys are pressed. 
+(define (change-heading struct)
+  (local [(define w (keyboard-w struct))
+          (define a (keyboard-a struct))
+          (define s (keyboard-s struct))
+          (define d (keyboard-d struct))
+          (define heading (player-heading struct))]
+    (cond [w ]
+          [a ]
+          [s ]
+          [d ]
+          [(and w d) ]
+          [(and d s) ]
+          [(and s a) ]
+          [(and a w) ]
+          [else struct])))
+          
 
 
 ; Player Structure -> Player Structure
 ; Given a Player Structure, struct, returns the Player structure with its coordinates altered, based upon its heading.
 ; Tock runs every tick (~25 ticks per second)
 (define (tock struct)
- (local ; local definitions for readability  
-    [(define x-heading (player-x-heading struct))
-     (define y-heading (player-y-heading struct))
-     (define x (player-x struct))
-     (define y (player-y struct))]
+ (local [(define heading (player-heading struct)) ; local definitions for readability  
+         (define x (player-x struct))
+         (define y (player-y struct))
+]
+   
+   
+
+   (
    
    (make-player
-    x-heading ; note: heading is unchanged
-    y-heading
+    heading
+
     (+ x x-heading)
-    (+ y y-heading)))) ; f(x) = MOVE-DISTANCE - |x| this ensures that the combined movement does not exceed MOVE-DISTANCE
+    (+ y y-heading)))) ; f(x) = SPEED - |x| this ensures that the combined movement does not exceed SPEED
 
 
 ; Player Structure -> Image
@@ -87,12 +101,14 @@
 ; the initial state of the playable character. 
 (define initial-player (make-player
                         0
+                        0
                         -4
                         (/ WINDOW-WIDTH 2)
                         (/ WINDOW-HEIGHT 2)))
 
 (big-bang initial-player
-  (on-tick tock)
+  (on-tick tock 0.1) 
   (to-draw draw)
-  (state #f)
-  (on-key key-handler))
+  (state #t)
+  (on-key key-handler)
+  (on-release release-handler))
