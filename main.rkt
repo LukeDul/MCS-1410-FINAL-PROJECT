@@ -52,6 +52,20 @@
 (define (update-keys struct new-keys) (make-world-state (world-state-player struct) new-keys))
 
 
+; (make-player (make-world-state (make-player "NORTH" (make-posn 250 450) 4) (make-keys #false #false #false #false)) (make-posn 250 446) 4)
+
+; World State -> World State 
+; updates heading and position of the player 
+(define (tock struct)
+ (local [(define heading (player-heading (world-state-player struct)))
+         (define new-position (change-position (world-state-player struct)))
+         (define new-heading (heading-handler struct))
+         (define speed (player-speed (world-state-player struct)))]
+   
+   (make-world-state (make-player new-heading new-position speed)
+                     (world-state-keyboard struct))))
+
+
 ; World State -> Player Structure
 ; changes the heading based upon which keys are pressed. 
 (define (heading-handler struct)
@@ -69,20 +83,7 @@
           [a "WEST"]
           [s "SOUTH"]
           [d "EAST"]
-          [else heading]))) 
-
-
-; (make-player (make-world-state (make-player "NORTH" (make-posn 250 450) 4) (make-keys #false #false #false #false)) (make-posn 250 446) 4)
-
-; World State -> World State 
-; updates heading and position of the player 
-(define (tock struct)
- (local [(define heading (player-heading (world-state-player struct)))
-         (define new-position (change-position (world-state-player struct)))
-         (define new-heading (heading-handler struct))
-         (define speed (player-speed (world-state-player struct)))]
-   
-   (make-world-state (make-player new-heading new-position speed) (world-state-keyboard struct))))
+          [else heading])))
 
 
 ; Player Structure -> Posn
@@ -145,7 +146,6 @@
 
 (define initial-world-state (make-world-state initial-player initial-keys))  
 
- 
 (big-bang initial-world-state 
   (on-tick tock)  
   (to-draw draw)
