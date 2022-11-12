@@ -25,6 +25,7 @@
          (define a (keys-a (world-state-keyboard struct)))
          (define s (keys-s (world-state-keyboard struct)))
          (define d (keys-d (world-state-keyboard struct)))]
+   
    (cond [(key=? input-key "w") (update-keys struct (make-keys #t a s d))]
          [(key=? input-key "a") (update-keys struct (make-keys w #t s d))]
          [(key=? input-key "s") (update-keys struct (make-keys w a #t d))]   
@@ -39,6 +40,7 @@
          (define a (keys-a (world-state-keyboard struct)))
          (define s (keys-s (world-state-keyboard struct)))
          (define d (keys-d (world-state-keyboard struct)))]
+   
    (cond [(key=? input-key "w") (update-keys struct(make-keys #f a s d))]
          [(key=? input-key "a") (update-keys struct(make-keys w #f s d))]
          [(key=? input-key "s") (update-keys struct(make-keys w a #f d))]   
@@ -59,35 +61,28 @@
           (define d (keys-d (world-state-keyboard struct)))
           (define heading (player-heading (world-state-player struct)))]
     
-    (cond [(and w d) (change-heading "NE" (world-state-player struct))]
-          [(and d s) (change-heading "SE" (world-state-player struct))]
-          [(and s a) (change-heading "SW" (world-state-player struct))]
-          [(and a w) (change-heading "NW" (world-state-player struct))]  
-          [w (change-heading "NORTH" (world-state-player struct))]
-          [a (change-heading "WEST"  (world-state-player struct))]
-          [s (change-heading "SOUTH" (world-state-player struct))]
-          [d (change-heading "EAST"  (world-state-player struct))]
-          [else struct])))  
+    (cond [(and w d) "NE"]
+          [(and d s) "SE"]
+          [(and s a) "SW"]
+          [(and a w) "NW"]  
+          [w "NORTH"]
+          [a "WEST"]
+          [s "SOUTH"]
+          [d "EAST"]
+          [else heading]))) 
 
-
-; Cardinal Direction, Player-Structure -> Player-Structure
-; Changes the heading of the given player to the given heading
-(define (change-heading new-heading struct)
-  (local [(define position (player-position struct))
-          (define speed (player-speed struct))]
-    (make-player new-heading position speed)))
 
 ; (make-player (make-world-state (make-player "NORTH" (make-posn 250 450) 4) (make-keys #false #false #false #false)) (make-posn 250 446) 4)
 
-; World State -> World State Structure
-; Given a Player Structure, struct, returns the Player structure with its coordinates altered, based upon its heading.
-; Tock runs every tick (~25 ticks per second)
+; World State -> World State 
+; updates heading and position of the player 
 (define (tock struct)
  (local [(define heading (player-heading (world-state-player struct)))
          (define new-position (change-position (world-state-player struct)))
          (define new-heading (heading-handler struct))
          (define speed (player-speed (world-state-player struct)))]
-   (make-world-state (make-player heading new-position speed) (world-state-keyboard struct))))
+   
+   (make-world-state (make-player new-heading new-position speed) (world-state-keyboard struct))))
 
 
 ; Player Structure -> Posn
@@ -97,7 +92,7 @@
           (define x (posn-x (player-position struct)))
           (define y (posn-y (player-position struct)))
           (define speed (player-speed struct))
-          (define diagonal-speed (ceiling (percentage 70 speed)))] ; 70 percent of speed in each direction approximates
+          (define diagonal-speed (ceiling (percentage 65 speed)))] ; 70 percent of speed in each direction approximates
                                                                 ; a diagonal speed equal to speed 
     
     (cond [(equal? heading "NORTH") (make-posn x (- y speed))]
@@ -144,16 +139,16 @@
 (define initial-player (make-player "NORTH"
                                     (make-posn (/ WINDOW-WIDTH 2) ; aligns player on the middle of x-axis
                                                (ceiling (percentage 90 WINDOW-HEIGHT))) ; aligns player on 90% of y-axis
-                                    4)) ; initial speed
+                                    8)) ; initial speed
+ 
+(define initial-keys (make-keys #f #f #f #f)) 
 
-(define initial-keys (make-keys #f #f #f #f))
-
-(define initial-world-state (make-world-state initial-player initial-keys))
+(define initial-world-state (make-world-state initial-player initial-keys))  
 
  
 (big-bang initial-world-state 
-  (on-tick tock 0.1)  
+  (on-tick tock)  
   (to-draw draw)
-  (state #true)
+  (state #f)
   (on-key press-handler)
   (on-release release-handler))
