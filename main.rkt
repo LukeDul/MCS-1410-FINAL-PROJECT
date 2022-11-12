@@ -1,114 +1,159 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
 #reader(lib "htdp-advanced-reader.ss" "lang")((modname main) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #t #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp")) #f)))
-om
+
+
 ; the width of the window 
 (define WINDOW-WIDTH 500)
 
 ; the height of the window 
 (define WINDOW-HEIGHT 500)
 
-; The cardinal, intercardinal, and secondary-intercardinal directions the player can move.  
-(define directions (N NE E SE S SW W NW))
-
-; player contains the heading, position & speed of the player character. 
-; heading can be any one of the compass directions
-(define-struct player [heading posn speed])
+; player contains the heading, position & speed of the player character.
+(define-struct player [heading position speed])
 
 ; holds the state of each usuable key 
-(define-struct keyboard [w a s d])
+(define-struct keys [w a s d])
+
+(define-struct world-state [player keyboard])
 
 
-; Structure, Key -> Structure 
+; World State, Key -> World State
 ; sets key to true when pressed 
-(define (key-handler struct input-key)
- (local [(define w (keyboard-w struct))
-         (define a (keyboard-a struct))
-         (define s (keyboard-s struct))
-         (define d (keyboard-d struct))]
-   (cond [(key=? input-key "w") (make-keyboard #t a s d)]
-         [(key=? input-key "a") (make-keyboard w #t s d)]
-         [(key=? input-key "s") (make-keyboard w a #t d)]   
-         [(key=? input-key "d") (make-keyboard w a s #t)])))
+(define (press-handler struct input-key)
+ (local [(define w (keys-w (world-state-keyboard struct)))
+         (define a (keys-a (world-state-keyboard struct)))
+         (define s (keys-s (world-state-keyboard struct)))
+         (define d (keys-d (world-state-keyboard struct)))]
+   (cond [(key=? input-key "w") (update-keys struct (make-keys #t a s d))]
+         [(key=? input-key "a") (update-keys struct (make-keys w #t s d))]
+         [(key=? input-key "s") (update-keys struct (make-keys w a #t d))]   
+         [(key=? input-key "d") (update-keys struct (make-keys w a s #t))]
+         [else struct])))
 
 
-; Structure, Key -> Structure 
+; World State, Key -> World State 
 ; sets key to false when released
 (define (release-handler struct input-key)
- (local [(define w (keyboard-w struct))
-         (define a (keyboard-a struct))
-         (define s (keyboard-s struct))
-         (define d (keyboard-d struct))]
-   (cond [(key=? input-key "w") (make-keyboard #f a s d)]
-         [(key=? input-key "a") (make-keyboard w #f s d)]
-         [(key=? input-key "s") (make-keyboard w a #f d)]   
-         [(k y=? input-key "d") (make-keyboard w a s #f)])))
+ (local [(define w (keys-w (world-state-keyboard struct)))
+         (define a (keys-a (world-state-keyboard struct)))
+         (define s (keys-s (world-state-keyboard struct)))
+         (define d (keys-d (world-state-keyboard struct)))]
+   (cond [(key=? input-key "w") (update-keys struct(make-keys #f a s d))]
+         [(key=? input-key "a") (update-keys struct(make-keys w #f s d))]
+         [(key=? input-key "s") (update-keys struct(make-keys w a #f d))]   
+         [(key=? input-key "d") (update-keys struct(make-keys w a s #f))]
+         [else struct])))
 
 
-; Keyboard Structure -> Player Structure
+; World State, Keys -> World State 
+(define (update-keys struct new-keys) (make-world-state (world-state-player struct) new-keys))
+
+
+; World State -> Player Structure
 ; changes the heading based upon which keys are pressed. 
-(define (change-heading struct)
-  (local [(define w (keyboard-w struct))
-          (define a (keyboard-a struct))
-          (define s (keyboard-s struct))
-          (define d (keyboard-d struct))
-          (define heading (player-heading struct))]
-    (cond [w ]
-          [a ]
-          [s ]
-          [d ]
-          [(and w d) ]
-          [(and d s) ]
-          [(and s a) ]
-          [(and a w) ]
-          [else struct])))
-          
+(define (heading-handler struct)
+  (local [(define w (keys-w (world-state-keyboard struct)))
+          (define a (keys-a (world-state-keyboard struct)))
+          (define s (keys-s (world-state-keyboard struct)))
+          (define d (keys-d (world-state-keyboard struct)))
+          (define heading (player-heading (world-state-player struct)))]
+    
+    (cond [(and w d) (change-heading "NE" (world-state-player struct))]
+          [(and d s) (change-heading "SE" (world-state-player struct))]
+          [(and s a) (change-heading "SW" (world-state-player struct))]
+          [(and a w) (change-heading "NW" (world-state-player struct))]  
+          [w (change-heading "NORTH" (world-state-player struct))]
+          [a (change-heading "WEST"  (world-state-player struct))]
+          [s (change-heading "SOUTH" (world-state-player struct))]
+          [d (change-heading "EAST"  (world-state-player struct))]
+          [else struct])))  
 
 
-; Player Structure -> Player Structure
+; Cardinal Direction, Player-Structure -> Player-Structure
+; Changes the heading of the given player to the given heading
+(define (change-heading new-heading struct)
+  (local [(define position (player-position struct))
+          (define speed (player-speed struct))]
+    (make-player new-heading position speed)))
+
+; (make-player (make-world-state (make-player "NORTH" (make-posn 250 450) 4) (make-keys #false #false #false #false)) (make-posn 250 446) 4)
+
+; World State -> World State Structure
 ; Given a Player Structure, struct, returns the Player structure with its coordinates altered, based upon its heading.
 ; Tock runs every tick (~25 ticks per second)
 (define (tock struct)
- (local [(define heading (player-heading struct)) ; local definitions for readability  
-         (define x (player-x struct))
-         (define y (player-y struct))
-]
-   
-   
-
-   (
-   
-   (make-player
-    heading
-
-    (+ x x-heading)
-    (+ y y-heading)))) ; f(x) = SPEED - |x| this ensures that the combined movement does not exceed SPEED
+ (local [(define heading (player-heading (world-state-player struct)))
+         (define new-position (change-position (world-state-player struct)))
+         (define new-heading (heading-handler struct))
+         (define speed (player-speed (world-state-player struct)))]
+   (make-world-state (make-player heading new-position speed) (world-state-keyboard struct))))
 
 
-; Player Structure -> Image
+; Player Structure -> Posn
+; changes the position of the player based upon the current heading and speed
+(define (change-position struct)
+  (local [(define heading (player-heading struct))
+          (define x (posn-x (player-position struct)))
+          (define y (posn-y (player-position struct)))
+          (define speed (player-speed struct))
+          (define diagonal-speed (ceiling (percentage 70 speed)))] ; 70 percent of speed in each direction approximates
+                                                                ; a diagonal speed equal to speed 
+    
+    (cond [(equal? heading "NORTH") (make-posn x (- y speed))]
+          [(equal? heading "SOUTH") (make-posn x (+ y speed))]
+          [(equal? heading "WEST")  (make-posn (- x speed) y)]
+          [(equal? heading "EAST")  (make-posn (+ x speed) y)]
+          
+          [(equal? heading "NE") (make-posn (+ x diagonal-speed) (- y diagonal-speed))]
+          [(equal? heading "NW") (make-posn (- x diagonal-speed) (- y diagonal-speed))]
+          [(equal? heading "SE") (make-posn (+ x diagonal-speed) (+ y diagonal-speed))]
+          [(equal? heading "SW") (make-posn (- x diagonal-speed) (+ y diagonal-speed))]
+          [else (print struct)])))
+
+
+; Number, Number -> Number
+; returns the given percentage of a number 
+(define (percentage percent number)
+  (* (/ percent 10) (/ number 10)))
+
+  
+; World State -> Image
 ; Given the Player Structure, struct, returns an image of the playerable character at the Player Structure's coordinates. 
 (define (draw struct)
-  (local
-    [(define x (player-x struct))
-     (define y (player-y struct))
-     
-     (define player-image (circle 10 'solid 'red))
-     (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'white))]
+  (local [(define x (posn-x (player-position (world-state-player struct))))
+          (define y (posn-y (player-position (world-state-player struct))))
+          (define heading (player-heading (world-state-player struct)))
+          (define player-image (circle 10 'solid 'red))
+          (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'gray))
+          (define w (keys-w (world-state-keyboard struct)))
+          (define a (keys-a (world-state-keyboard struct)))
+          (define s (keys-s (world-state-keyboard struct)))
+          (define d (keys-d (world-state-keyboard struct)))]
     
-    (place-image player-image x y background)))
+    (place-image (above (text (if w "#t" "#f") 12 "olive")
+                        (text (if a "#t" "#f") 12 "olive")
+                        (text (if s "#t" "#f") 12 "olive")
+                        (text (if d "#t" "#f") 12 "olive")
+                        (text heading 12 "olive"))
+                 100 100
+                 (place-image player-image x y background))))
 
 
 ; the initial state of the playable character. 
-(define initial-player (make-player
-                        0
-                        0
-                        -4
-                        (/ WINDOW-WIDTH 2)
-                        (/ WINDOW-HEIGHT 2)))
+(define initial-player (make-player "NORTH"
+                                    (make-posn (/ WINDOW-WIDTH 2) ; aligns player on the middle of x-axis
+                                               (ceiling (percentage 90 WINDOW-HEIGHT))) ; aligns player on 90% of y-axis
+                                    4)) ; initial speed
 
-(big-bang initial-player
-  (on-tick tock 0.1) 
+(define initial-keys (make-keys #f #f #f #f))
+
+(define initial-world-state (make-world-state initial-player initial-keys))
+
+ 
+(big-bang initial-world-state 
+  (on-tick tock 0.1)  
   (to-draw draw)
-  (state #t)
-  (on-key key-handler)
+  (state #true)
+  (on-key press-handler)
   (on-release release-handler))
