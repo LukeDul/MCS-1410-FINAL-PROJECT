@@ -64,7 +64,7 @@
                      (world-state-keyboard struct))))
 
 
-; World State -> Player Structure
+; World State -> String
 ; changes the heading based upon which keys are pressed. 
 (define (heading-handler struct)
   (local [(define w (keys-w (world-state-keyboard struct)))
