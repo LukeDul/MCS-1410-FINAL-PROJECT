@@ -20,9 +20,7 @@
 (define-struct hit-box [width height x y])
 
 ; worldstate 
-(define-struct world-state [player keyboard hit-box])
-
-
+(define-struct world-state [player keyboard hit-box]) 
 
 ;******************************************************* keyboard handling *******************************************************
 
@@ -61,9 +59,6 @@
 (define (update-keys struct new-keys) (make-world-state (world-state-player struct) new-keys (world-state-hit-box struct)))
 
 
-; (make-player (make-world-state (make-player "NORTH" (make-posn 250 450) 4) (make-keys #false #false #false #false)) (make-posn 250 446) 4)
-
-
 ;******************************************************* on-tick / movement *******************************************************
 
 
@@ -74,9 +69,10 @@
          (define new-position (change-position (world-state-player struct)))
          (define new-heading (heading-handler struct))
          (define speed (player-speed (world-state-player struct)))
-         (define current-position (player-position (world-state-player struct)))]
+         (define current-position (player-position (world-state-player struct)))
+         (define hit-boxes (world-state-hit-box struct))]
    
-   (cond [(square-collision? current-position PLAYER-HITBOX (world-state-hit-box struct)); if player is colliding w/ hitbox
+   (cond [(colliding? current-position PLAYER-HITBOX hit-boxes); if player is colliding w/ hitbox
           (make-world-state (make-player heading current-position speed) ; freeze player 
                             (world-state-keyboard struct)
                             (world-state-hit-box struct))] 
@@ -85,7 +81,6 @@
                                  (world-state-keyboard struct)
                                  (world-state-hit-box struct))]))) ; retains keyboard
                                  
-
 
 ; World State -> String
 ; changes the heading based upon which keys are pressed. 
@@ -114,7 +109,7 @@
           (define x (posn-x (player-position struct)))
           (define y (posn-y (player-position struct)))
           (define speed (player-speed struct))
-          (define diagonal-speed (ceiling (percentage 65 speed)))] ; 70 percent of speed in each direction approximates
+          (define diagonal-speed (ceiling (percentage 70 speed)))] ; 70 percent of speed in each direction approximates
                                                                 ; a diagonal speed equal to speed 
     
     (cond [(equal? heading "NORTH") (make-posn x (- y speed))]
@@ -126,19 +121,26 @@
           [(equal? heading "NW") (make-posn (- x diagonal-speed) (- y diagonal-speed))]
           [(equal? heading "SE") (make-posn (+ x diagonal-speed) (+ y diagonal-speed))]
           [(equal? heading "SW") (make-posn (- x diagonal-speed) (+ y diagonal-speed))]
-          [else (print struct)])))
+          [else (print struct)]))) 
 
 
 ; Number, Number -> Number
 ; returns the given percentage of a number 
 (define (percentage percent number)
-  (* (/ percent 10) (/ number 10)))
+  (* (/ percent 10) (/ number 10))) 
 
 
 ;**************************************************** collision ****************************************************
 
+; List of hit-boxes, Posn, Number  -> Boolean
+; checks if a square surrounding a point with width & height size is colliding w/ any hit-box in the list, hit-boxes
+(define (colliding? point size hit-boxes)
+  (cond [(empty? hit-boxes) #false]
+        [(square-collision? point size (first hit-boxes)) #true]
+        [else (colliding? point size (rest hit-boxes))])) 
+ 
 
-; Posn, Hit-box -> Boolean
+; Posn, Hit-box, Number -> Boolean
 ; checks if a 4 points surrounding a point is colliding with a point 
 (define (square-collision? point size hit-box)
   (if (or
@@ -165,9 +167,9 @@
        (<= (posn-y point) (+ (hit-box-y hit-box) (/ (hit-box-height hit-box) 2)))
        (>= (posn-y point) (- (hit-box-y hit-box) (/ (hit-box-height hit-box) 2))))
       #t
-      #f)) 
+      #f))  
 
-
+ 
 ;******************************************************* rendering ****************************************************
  
 ; World State -> Image
@@ -175,13 +177,18 @@
 (define (draw struct)
   (local [(define x (posn-x (player-position (world-state-player struct))))
           (define y (posn-y (player-position (world-state-player struct))))
+
+          
           (define heading (player-heading (world-state-player struct)))
-          (define player-image (square (* 2 PLAYER-HITBOX) 'solid 'red))  ; (* PLAYER-HITBOX (sqrt 2))
+          (define player-image (square (* 2 PLAYER-HITBOX) 'outline 'red))  ; (* PLAYER-HITBOX (sqrt 2))
           (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'gray))
+            
           (define w (keys-w (world-state-keyboard struct)))
           (define a (keys-a (world-state-keyboard struct)))
           (define s (keys-s (world-state-keyboard struct)))
-          (define d (keys-d (world-state-keyboard struct)))]
+          (define d (keys-d (world-state-keyboard struct)))
+          
+          (define hit-boxes (world-state-hit-box struct))]
     
     (place-image (above (text (if w "#t" "#f") 12 "olive") 
                         (text (if a "#t" "#f") 12 "olive")
@@ -189,10 +196,33 @@
                         (text (if d "#t" "#f") 12 "olive") 
                         (text heading 12 "olive")) 
                  100 100
-                 (place-image player-image x y (overlay (square 10 'solid 'black) background))))) 
+                 (place-image player-image x y (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background))))) ; final placement 
+ 
+
+; list of hit-boxes -> list of posns
+; generates a list of posns based upon the list of hit-boxes
+(define (generate-posns hit-boxes)
+  (map (lambda (hit-box) (make-posn (hit-box-x hit-box) (hit-box-y hit-box))) hit-boxes))
+                    
+                    
+; list of hit-boxes -> list of rectangles  
+; generates a list of rectangles based upon the list of hit-boxes 
+(define (generate-rectangles hit-boxes)
+  (map (lambda (hit-box) (rectangle (hit-box-width hit-box) (hit-box-height hit-box) 'outline 'blue)) hit-boxes))
 
 
-;******************************************************* initial states ************************************************
+; ******************************************************* initial states ************************************************
+
+;contains each hit-box 
+(define level0
+  (list (make-hit-box 25 500 0 250)
+        (make-hit-box 25 25 50 100)  
+        (make-hit-box 25 25 300 300)))
+
+(define level1
+  (list (make-hit-box 60 500 0 250)
+        (make-hit-box 70 25 50 100)  
+        (make-hit-box 80 25 300 300))) 
 
 ; the initial state of the playable character. 
 (define initial-player (make-player "NORTH"
@@ -200,18 +230,17 @@
                                                (ceiling (percentage 90 WINDOW-HEIGHT))) ; aligns player on 90% of y-axis
                                     1)) ; initial speed
 
-(define test-dummy (make-hit-box 10 10 (/ WINDOW-HEIGHT 2) (/ WINDOW-WIDTH 2)))
+(define test-dummy (make-hit-box 100 10 100 50))
  
-(define initial-keys (make-keys #f #f #f #f)) 
+(define initial-keys (make-keys #f #f #f #f))   
 
-(define initial-world-state (make-world-state initial-player initial-keys test-dummy)) 
+(define initial-world-state (make-world-state initial-player initial-keys level1))
 
-
-;******************************************************* big bang ***********************************************
+; ******************************************************* big bang ***********************************************
 
 (big-bang initial-world-state 
   (on-tick tock 0.001)  
   (to-draw draw)
   (state #f)
   (on-key press-handler)
-  (on-release release-handler))
+  (on-release release-handler)) 
