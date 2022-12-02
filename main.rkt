@@ -80,7 +80,7 @@
          [else (make-world-state (make-player new-heading new-position speed) ; updates player
                                  (world-state-keyboard struct)
                                  (world-state-hit-box struct))]))) ; retains keyboard
-                                 
+
 
 ; World State -> String
 ; changes the heading based upon which keys are pressed. 
@@ -110,8 +110,8 @@
           (define y (posn-y (player-position struct)))
           (define speed (player-speed struct))
           (define diagonal-speed (ceiling (percentage 70 speed)))] ; 70 percent of speed in each direction approximates
-                                                                ; a diagonal speed equal to speed 
-    
+                                                                ; a diagonal speed equal to speed
+
     (cond [(equal? heading "NORTH") (make-posn x (- y speed))]
           [(equal? heading "SOUTH") (make-posn x (+ y speed))]
           [(equal? heading "WEST")  (make-posn (- x speed) y)]
@@ -222,7 +222,7 @@
 (define level1
   (list (make-hit-box 60 500 0 250)
         (make-hit-box 70 25 50 100)  
-        (make-hit-box 80 25 300 300))) 
+        (make-hit-box 80 25 300 300)))  
 
 ; the initial state of the playable character. 
 (define initial-player (make-player "NORTH"
