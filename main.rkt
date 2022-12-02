@@ -2,7 +2,7 @@
 ;; about the language level of this file in a form that our tools can easily process.
 #reader(lib "htdp-advanced-reader.ss" "lang")((modname main) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #t #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp")) #f)))
 ; the width of the game window 
-(define WINDOW-WIDTH 500)
+(define WINDOW-WIDTH 1000)
 
 ; the height of the game window 
 (define WINDOW-HEIGHT 500)
@@ -25,7 +25,7 @@
 ;******************************************************* keyboard handling *******************************************************
 
 
-; World State, Key -> World State
+; World State, Key -> World State 
 ; sets key to true when pressed 
 (define (press-handler struct input-key)
  (local [(define w (keys-w (world-state-keyboard struct)))
@@ -37,11 +37,11 @@
          [(key=? input-key "a") (update-keys struct (make-keys w #t s d))]
          [(key=? input-key "s") (update-keys struct (make-keys w a #t d))]   
          [(key=? input-key "d") (update-keys struct (make-keys w a s #t))]
-         [else struct])))
+         [else struct])))  
 
 
 ; World State, Key -> World State 
-; sets key to false when released
+; sets key to false when released 
 (define (release-handler struct input-key)
  (local [(define w (keys-w (world-state-keyboard struct)))
          (define a (keys-a (world-state-keyboard struct)))
@@ -127,8 +127,8 @@
 ; Number, Number -> Number
 ; returns the given percentage of a number 
 (define (percentage percent number)
-  (* (/ percent 10) (/ number 10))) 
-
+  (* (/ percent 10) (/ number 10)))  
+ 
 
 ;**************************************************** collision ****************************************************
 
@@ -215,32 +215,33 @@
 
 ;contains each hit-box 
 (define level0
-  (list (make-hit-box 25 500 0 250)
-        (make-hit-box 25 25 50 100)  
+  (list (make-hit-box 25 500 0 250) ; width height x y
+        (make-hit-box 800 25 400 0)  
         (make-hit-box 25 25 300 300)))
 
 (define level1
-  (list (make-hit-box 60 500 0 250)
-        (make-hit-box 70 25 50 100)  
-        (make-hit-box 80 25 300 300)))  
+  (list (make-hit-box 100 500 50 250)
+        (make-hit-box 800 100 400 50)   
+        (make-hit-box 800 100 600 250)))   
 
-; the initial state of the playable character. 
-(define initial-player (make-player "NORTH"
-                                    (make-posn (/ WINDOW-WIDTH 2) ; aligns player on the middle of x-axis
-                                               (ceiling (percentage 90 WINDOW-HEIGHT))) ; aligns player on 90% of y-axis
-                                    1)) ; initial speed
+; the initial state of the playable character.  
+(define initial-player (make-player "WEST"
+                                    (make-posn 950 ; aligns player on the middle of x-axis
+                                               450) ; aligns player on 90% of y-axis
+                                    8)) ; initial speed
 
-(define test-dummy (make-hit-box 100 10 100 50))
+(define test-dummy (make-hit-box 100 10 100 50)) 
  
-(define initial-keys (make-keys #f #f #f #f))   
+(define initial-keys (make-keys #f #f #f #f)) 
 
 (define initial-world-state (make-world-state initial-player initial-keys level1))
 
 ; ******************************************************* big bang ***********************************************
 
 (big-bang initial-world-state 
-  (on-tick tock 0.001)  
+  (on-tick tock)  
   (to-draw draw)
+  (name "walmart celeste")
   (state #f)
   (on-key press-handler)
   (on-release release-handler)) 
