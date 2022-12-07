@@ -20,7 +20,17 @@
 (define-struct hit-box [width height x y])
 
 ; worldstate 
-(define-struct world-state [player keyboard hit-box]) 
+(define-struct world-state [player keyboard hit-box ])
+
+;(define-struct world-state [menu game-play])
+
+;(define-struct game-play [player keyboard hit-box])
+
+; buttons is a list of all buttons on given screen
+; screen is the current screen
+; (define-struct menu [screen buttons] 
+  
+ 
 
 ;******************************************************* keyboard handling *******************************************************
 
@@ -48,15 +58,17 @@
          (define s (keys-s (world-state-keyboard struct)))
          (define d (keys-d (world-state-keyboard struct)))]
    
-   (cond [(key=? input-key "w") (update-keys struct(make-keys #f a s d))]
-         [(key=? input-key "a") (update-keys struct(make-keys w #f s d))]
-         [(key=? input-key "s") (update-keys struct(make-keys w a #f d))]   
-         [(key=? input-key "d") (update-keys struct(make-keys w a s #f))]
+   (cond [(key=? input-key "w") (update-keys struct (make-keys #f a s d))]
+         [(key=? input-key "a") (update-keys struct (make-keys w #f s d))]
+         [(key=? input-key "s") (update-keys struct (make-keys w a #f d))]   
+         [(key=? input-key "d") (update-keys struct (make-keys w a s #f))]
          [else struct]))) 
 
 
-; World State, Keys -> World State 
-(define (update-keys struct new-keys) (make-world-state (world-state-player struct) new-keys (world-state-hit-box struct)))
+; World State, Keys -> World State
+; makes a new world state with the given keyboard state 
+(define (update-keys struct new-keys)
+  (make-world-state (world-state-player struct) new-keys (world-state-hit-box struct)))
 
 
 ;******************************************************* on-tick / movement *******************************************************
@@ -66,21 +78,21 @@
 ; updates heading and position of the player 
 (define (tock struct)
  (local [(define heading (player-heading (world-state-player struct)))
-         (define new-position (change-position (world-state-player struct)))
          (define new-heading (heading-handler struct))
+         (define position (player-position (world-state-player struct)))
+         (define new-position (change-position (world-state-player struct)))
          (define speed (player-speed (world-state-player struct)))
-         (define current-position (player-position (world-state-player struct)))
          (define hit-boxes (world-state-hit-box struct))]
    
-   (cond [(colliding? current-position PLAYER-HITBOX hit-boxes); if player is colliding w/ hitbox
-          (make-world-state (make-player heading current-position speed) ; freeze player 
+   (cond [(colliding? position PLAYER-HITBOX hit-boxes); if player is colliding w/ hitbox
+          (make-world-state (make-player heading position speed) ; freeze player 
                             (world-state-keyboard struct)
                             (world-state-hit-box struct))] 
          
          [else (make-world-state (make-player new-heading new-position speed) ; updates player
                                  (world-state-keyboard struct)
                                  (world-state-hit-box struct))]))) ; retains keyboard
-
+ 
 
 ; World State -> String
 ; changes the heading based upon which keys are pressed. 
@@ -137,7 +149,7 @@
 (define (colliding? point size hit-boxes)
   (cond [(empty? hit-boxes) #false]
         [(square-collision? point size (first hit-boxes)) #true]
-        [else (colliding? point size (rest hit-boxes))])) 
+        [else (colliding? point size (rest hit-boxes))]))  
  
 
 ; Posn, Hit-box, Number -> Boolean
@@ -199,6 +211,8 @@
                  (place-image player-image x y (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background))))) ; final placement 
  
 
+
+      
 ; list of hit-boxes -> list of posns
 ; generates a list of posns based upon the list of hit-boxes
 (define (generate-posns hit-boxes)
@@ -217,22 +231,20 @@
 (define level0
   (list (make-hit-box 25 500 0 250) ; width height x y
         (make-hit-box 800 25 400 0)  
-        (make-hit-box 25 25 300 300)))
+        (make-hit-box 25 25 300 300))) 
 
 (define level1
   (list (make-hit-box 100 500 50 250)
         (make-hit-box 800 100 400 50)   
-        (make-hit-box 800 100 600 250)))   
+        (make-hit-box 800 100 600 250)))  
 
 ; the initial state of the playable character.  
 (define initial-player (make-player "WEST"
                                     (make-posn 950 ; aligns player on the middle of x-axis
                                                450) ; aligns player on 90% of y-axis
                                     8)) ; initial speed
-
-(define test-dummy (make-hit-box 100 10 100 50)) 
  
-(define initial-keys (make-keys #f #f #f #f)) 
+(define initial-keys (make-keys #f #f #f #f))  
 
 (define initial-world-state (make-world-state initial-player initial-keys level1))
 
