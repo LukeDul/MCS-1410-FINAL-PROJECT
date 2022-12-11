@@ -99,11 +99,12 @@
 (define (tock struct)
 
          ; shorthand 
- (local [(define current-heading (player-heading (world-state-player struct)))
+ (local [(define keyboard-state (world-state-keyboard struct))
+         (define current-heading (player-heading (world-state-player struct)))
          (define current-desired-heading (player-desired-heading (world-state-player struct)))
          (define position (player-position (world-state-player struct)))
          (define speed (player-speed (world-state-player struct)))
-         (define hit-boxes (world-state-hit-box struct))
+         (define hit-boxes (world-state-hit-box struct)) 
 
          ; increments ticks 
          (define ticks (+ 1 (world-state-ticks struct)))
@@ -112,7 +113,7 @@
          (define new-heading (turn-heading current-heading current-desired-heading NW NORTH))
 
          ; changes desired-heading based upon which keys are pressed
-         (define new-desired-heading (desired-heading-handler struct)) 
+         (define new-desired-heading (desired-heading-handler keyboard-state current-desired-heading))
 
          ; changes the players position based upon the current heading and speed
          (define new-position (change-position current-heading position speed))]
@@ -152,14 +153,13 @@
         [else (turn-right current-heading max-heading min-heading)]))
   
 
-; World State -> String 
-; changes the heading based upon which keys are pressed. 
-(define (desired-heading-handler struct)
-  (local [(define w (keys-w (world-state-keyboard struct)))
-          (define a (keys-a (world-state-keyboard struct))) 
-          (define s (keys-s (world-state-keyboard struct)))
-          (define d (keys-d (world-state-keyboard struct)))
-          (define heading (player-desired-heading (world-state-player struct)))]
+; Keyboard State, Number -> Number 
+; Changes the heading based upon which keys are pressed. If none are pressed returns the last desired-heading. 
+(define (desired-heading-handler keyboard-state current-desired-heading)
+  (local [(define w (keys-w keyboard-state))
+          (define a (keys-a keyboard-state)) 
+          (define s (keys-s keyboard-state))
+          (define d (keys-d keyboard-state))] 
     
     (cond [(and w d) NE]
           [(and d s) SE] 
@@ -169,7 +169,7 @@
           [a WEST]
           [s SOUTH]
           [d EAST]
-          [else heading])))
+          [else current-desired-heading]))) 
 
 
 ; Number, Number, Number, Number Number -> Boolean
@@ -278,7 +278,7 @@
        (>= (posn-x point) (- (hit-box-x hit-box) (/ (hit-box-width hit-box) 2)))
        (<= (posn-y point) (+ (hit-box-y hit-box) (/ (hit-box-height hit-box) 2)))
        (>= (posn-y point) (- (hit-box-y hit-box) (/ (hit-box-height hit-box) 2))))
-      #t
+      #t 
       #f))   
 
 ;******************************************************* rendering ****************************************************
@@ -315,7 +315,7 @@
 ; displays various values from the World State for debugging 
 (define (debugger struct)
   (local [(define heading (player-heading (world-state-player struct)))
-          (define desired-heading (player-desired-heading (world-state-player struct)))
+          (define desired-heading (player-desired-heading (world-state-player struct))) 
           (define y (posn-y (player-position (world-state-player struct))))
           (define x (posn-x (player-position (world-state-player struct))))
           (define ticks (world-state-ticks struct))
@@ -358,7 +358,7 @@
 (define level0
   (list (make-hit-box 25 500 0 250) ; width height x y
         (make-hit-box 800 25 400 0)  
-        (make-hit-box 25 25 300 300))) 
+        (make-hit-box 25 25 300 300)))  
  
 (define level1
   (list (make-hit-box 100 500 50 250) 
