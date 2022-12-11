@@ -19,10 +19,14 @@
 ; contains the width, height, and position of a hitbox 
 (define-struct hit-box [width height x y])
 
+;
+(define-struct menu [buttons])
+
 ; worldstate 
 (define-struct world-state [player keyboard hit-box ticks])
 
-(define-struct abs-heading [left right heading])
+; List, Posn, hit-box, hit-box 
+(define-struct level-state [hit-box start-point-position end-box-position save-box-position])
 
 (define NORTH 1)
 (define NE 2)
@@ -33,20 +37,49 @@
 (define WEST 7)
 (define NW 8)
 
-
-; Heading, Desired Heading -> Heading
-; Number, Number ->  
-; returns whethe
-
-; problem: always turns right 
-
 ;(define-struct world-state [menu game-play])
 
 ;(define-struct game-play [player keyboard hit-box]) 
 
 ; buttons is a list of all buttons on given screen
 ; screen is the current screen
-; (define-struct menu [screen buttons] 
+; (define-struct menu [screen buttons]
+
+
+#| TO DO
+
+
+
+Menus
+ - Title Menu
+   - Start Button -> Level 1
+   - Continue Button -> Last Save Point 
+   - Level Select Button
+ 
+ - Level Selector Menu
+   - Level 1
+   - Level 2
+   - Level 3 (Only Accessible if 2 is beaten etc)
+ 
+ - Escape Menu
+   - Exit -> Title
+   - Exit -> Level Select
+ 
+ - Win Screen / Credits 
+
+
+Save State
+  - Holds Last Save Point
+  - Completed Levels 
+
+Level State 
+  - Save Point Hit-box Position
+  - Start Position
+  - End Hit-box position
+
+
+
+|#
   
  
 
@@ -137,7 +170,7 @@
                                                 speed
                                                 current-heading))] 
          ; otherwise continue as normal  
-         [else (cond [(= 4 ticks)
+         [else (cond [(= 3 ticks)
                       (update-player-and-ticks struct 0 (make-player new-heading new-player-position speed new-desired-heading))]
 
                      [else
@@ -264,7 +297,7 @@
         [else (colliding? point size (rest hit-boxes))]))  
  
 
-; Posn, Hit-box, Number -> Boolean
+; Posn, Hit-box, Number -> Boolean 
 ; checks if a 4 points surrounding a point is colliding with a point 
 (define (square-collision? point size hit-box)
   (if (or
@@ -335,12 +368,14 @@
           (define a (keys-a (world-state-keyboard struct)))
           (define s (keys-s (world-state-keyboard struct)))
           (define d (keys-d (world-state-keyboard struct)))]
+    
     (above (text (if w "W: #T" "W: #F") 12 "red")
            (text (if a "A: #T" "A: #F") 12 "red") 
            (text (if s "S: #T" "S: #F") 12 "red")
            (text (if d "D: #T" "D: #F") 12 "red") 
            (text (number->string x) 12 "orange")
            (text (number->string y) 12 "orange")
+           
            (text (cond [(= heading 1)"Current Heading: N"]
                        [(= heading 2)"Current Heading: NE"]
                        [(= heading 3)"Current Heading: E"]
@@ -349,6 +384,7 @@
                        [(= heading 6)"Current Heading: SW"]
                        [(= heading 7)"Current Heading: W"]
                        [(= heading 8)"Current Heading: NW"]) 12 "red")
+           
            (text (cond [(= desired-heading 1)"Desired Heading: N"]
                        [(= desired-heading 2)"Desired Heading: NE"] 
                        [(= desired-heading 3)"Desired Heading: E"]
@@ -357,6 +393,7 @@
                        [(= desired-heading 6)"Desired Heading: SW"]
                        [(= desired-heading 7)"Desired Heading: W"]
                        [(= desired-heading 8)"Desired Heading: NW"]) 12 "yellow")
+           
            (text (number->string ticks) 12 "green")))) 
 
 
