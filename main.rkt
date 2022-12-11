@@ -22,12 +22,9 @@
 ;
 (define-struct menu [buttons])
 
+(define-struct level [hit-boxes start-position end-hitbox])
 ; worldstate 
 (define-struct world-state [player keyboard level ticks])
-
-
-
-
 
 (define NORTH 1)
 (define NE 2)
@@ -143,70 +140,41 @@ Level State
          (define hit-boxes (level-state-hit-boxes (world-state-level struct)))
          (define end-box (level-state-end-box (world-state-level struct)))
          (define save-box (level-state-save-box (world-state-level struct)))
+         (define start-posn (level-state-start-posn (world-state-level struct)))
 
          ; increments ticks 
          (define ticks (+ 1 (world-state-ticks struct)))
 
          ; turns the heading towards the desired heading 
-         (define new-heading (turn-heading current-heading
-                                           current-desired-heading
-                                           NW
-                                           NORTH))
+         (define new-heading (turn-heading current-heading current-desired-heading NW NORTH))
 
          ; Changes desired-heading based upon which keys are pressed.
-         (define new-desired-heading (desired-heading-handler keyboard-state
-                                                              current-desired-heading))
+         (define new-desired-heading (desired-heading-handler keyboard-state current-desired-heading))
 
          ; Changes the players position based upon the current heading, position and speed.
-         (define new-player-position (change-position current-heading
-                                                      current-player-position
-                                                      speed))]
-  
-         ; if player is colliding w/ a hitbox 
-   (cond [(colliding? current-player-position PLAYER-HITBOX hit-boxes)  
+         (define new-player-position (change-position current-heading current-player-position speed))]
 
-          ; freeze player
-          (update-player-and-ticks struct
-                                   ticks
-                                   (make-player current-heading
-                                                current-player-position
-                                                speed
-                                                current-heading))]
-         
 
-         ; if player is colliding w/ the end box 
+    
+         ; if player is colliding w/ a hitbox move player to start coordinates 
+   (cond [(colliding? current-player-position PLAYER-HITBOX hit-boxes)
+          (update-player-and-ticks struct ticks (make-player NORTH start-posn speed NORTH))]
+
+         ; if player is colliding w/ the end box open level select
          [(colliding? current-player-position PLAYER-HITBOX (list end-box))
+          (update-player-and-ticks struct ticks (make-player current-heading current-player-position speed current-heading))]
 
-                   ; freeze player
-          (update-player-and-ticks struct
-                                   ticks
-                                   (make-player current-heading
-                                                current-player-position
-                                                speed
-                                                current-heading))]
-         
-
-         ; if player is colliding w/ the save box 
+         ; if player is colliding w/ the save box set start coordinates to save-box coordinates 
          [(colliding? current-player-position PLAYER-HITBOX (list save-box))
-
-                   ; freeze player 
-          (update-player-and-ticks struct
-                                   ticks
-                                   (make-player current-heading
-                                                current-player-position
-                                                speed
-                                                current-heading))]
-                     
-         ; otherwise continue as normal  
-         [else (cond [(= 3 ticks)
-                      (update-player-and-ticks struct 0 (make-player new-heading new-player-position speed new-desired-heading))]
-
-                     [else
-                      (update-player-and-ticks struct ticks  (make-player current-heading new-player-position speed new-desired-heading))])])))
-            
- 
-; Number, Number, Number -> Number, Number 
-; if a number, ticks, is large enough, turns the player, otherwise, leaves it as is.
+          
+          (make-world-state   (cond [(<= 3 ticks) (make-player new-heading new-player-position speed new-desired-heading)]
+                                    [else (make-player current-heading new-player-position speed new-desired-heading)])
+                              (world-state-keyboard struct)
+                              (make-level-state hit-boxes (make-posn (hit-box-x save-box) (hit-box-y save-box)) end-box save-box)
+                              (if (<= 3 ticks) 0 ticks))]
+          
+         ; otherwise continue movement  
+         [else (movement-handler struct 3 ticks current-heading new-heading new-player-position new-desired-heading speed)])))
 
 
 ; World State, Number, Player State -> World State
@@ -216,6 +184,22 @@ Level State
                     (world-state-keyboard struct)
                     (world-state-level struct)
                     ticks))
+
+
+
+;(define (update-player-ticks-and-start-posn struct ticks new-level-state new-player-state)
+;  (make-world-state new-player-state
+;                    (world-state-keyboard struct) 
+ ;                   new-level-state
+ ;                   ticks))
+
+; Number, Number, Number, Number, Number 
+; handles movement shit fuck 
+(define (movement-handler struct tick-limit ticks current-heading new-heading new-player-position new-desired-heading speed)
+  (cond [(<= tick-limit ticks)
+         (update-player-and-ticks struct 0 (make-player new-heading new-player-position speed new-desired-heading))]
+        [else (update-player-and-ticks struct ticks (make-player current-heading new-player-position speed new-desired-heading))]))
+
 
 
 ; Number, Number, Number -> Number
@@ -357,7 +341,7 @@ Level State
 ;******************************************************* rendering ****************************************************
 
 ; List, Posn, hit-box, hit-box 
-(define-struct level-state [hit-boxes start-point-position end-box save-box])
+(define-struct level-state [hit-boxes start-posn end-box save-box])
 
 ; World State -> Image
 ; Given the Player Structure, struct, returns an image of the playerable character at the Player Structure's coordinates. 
@@ -417,29 +401,28 @@ Level State
            (text (number->string x) 12 "orange")
            (text (number->string y) 12 "orange")
            
-           (text (cond [(= heading 1)"Current Heading: N"]
-                       [(= heading 2)"Current Heading: NE"]
-                       [(= heading 3)"Current Heading: E"]
-                       [(= heading 4)"Current Heading: SE"] 
-                       [(= heading 5)"Current Heading: S"]  
-                       [(= heading 6)"Current Heading: SW"]
-                       [(= heading 7)"Current Heading: W"]
-                       [(= heading 8)"Current Heading: NW"]) 12 "red")
+           (text (cond [(= heading 1) "Current Heading: N"]
+                       [(= heading 2) "Current Heading: NE"]
+                       [(= heading 3) "Current Heading: E"]
+                       [(= heading 4) "Current Heading: SE"] 
+                       [(= heading 5) "Current Heading: S"]  
+                       [(= heading 6) "Current Heading: SW"]
+                       [(= heading 7) "Current Heading: W"]
+                       [(= heading 8) "Current Heading: NW"]) 12 "red")
            
-           (text (cond [(= desired-heading 1)"Desired Heading: N"]
-                       [(= desired-heading 2)"Desired Heading: NE"] 
-                       [(= desired-heading 3)"Desired Heading: E"]
-                       [(= desired-heading 4)"Desired Heading: SE"] 
-                       [(= desired-heading 5)"Desired Heading: S"]
-                       [(= desired-heading 6)"Desired Heading: SW"]
-                       [(= desired-heading 7)"Desired Heading: W"]
-                       [(= desired-heading 8)"Desired Heading: NW"]) 12 "yellow")
+           (text (cond [(= desired-heading 1) "Desired Heading: N"]
+                       [(= desired-heading 2) "Desired Heading: NE"] 
+                       [(= desired-heading 3) "Desired Heading: E"]
+                       [(= desired-heading 4) "Desired Heading: SE"] 
+                       [(= desired-heading 5) "Desired Heading: S"]
+                       [(= desired-heading 6) "Desired Heading: SW"]
+                       [(= desired-heading 7) "Desired Heading: W"]
+                       [(= desired-heading 8) "Desired Heading: NW"]) 12 "yellow")
            
            (text (number->string ticks) 12 "green")))) 
 
 
 ; ******************************************************* initial states ************************************************
-(define-struct level [hit-boxes start-position end-hitbox])
 
 (define empty-level
   (list (make-hit-box 0 0 0 0)))
@@ -466,8 +449,7 @@ Level State
 
 ; the initial state of the playable character. 
 (define initial-player (make-player WEST
-                                    (make-posn 950 ; aligns player on the middle of x-axis
-                                               450) ; aligns player on 90% of y-axis
+                                    level0-start-posn; aligns player on 90% of y-axis
                                     8  
                                     WEST)) ; initial speed
  
