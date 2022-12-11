@@ -116,8 +116,7 @@
          (define ticks (+ 1 (world-state-ticks struct)))
 
          ; mutated values
-         ;(define new-heading (heading-handler current-heading current-desired-heading ticks))
-         (define new-heading (desired-heading-handler struct))
+         (define new-heading (turn-heading current-heading current-desired-heading NW NORTH))
          (define new-desired-heading (desired-heading-handler struct)) ; changes heading based upon which keys are pressed 
          (define new-position (change-position current-heading position speed))] ;changes the players position based upon heading and speed
 
@@ -146,7 +145,13 @@
                     (world-state-hit-box struct)
                     ticks))
 
-;(define (heading-handler current-heading desired-heading ticks)
+
+; Number, Number, Number -> Number
+; moves the heading towards the desired heading on the shortest path  
+(define (turn-heading current-heading desired-heading max-heading min-heading)
+  (cond [(= current-heading desired-heading) current-heading]
+        [(turn-left? current-heading desired-heading max-heading min-heading) (turn-left current-heading max-heading min-heading)]
+        [else (turn-right current-heading max-heading min-heading)]))
   
 
 ; World State -> String 
@@ -156,10 +161,10 @@
           (define a (keys-a (world-state-keyboard struct))) 
           (define s (keys-s (world-state-keyboard struct)))
           (define d (keys-d (world-state-keyboard struct)))
-          (define heading (player-heading (world-state-player struct)))]
+          (define heading (player-desired-heading (world-state-player struct)))]
     
     (cond [(and w d) NE]
-          [(and d s) SE]
+          [(and d s) SE] 
           [(and s a) SW]
           [(and a w) NW]  
           [w NORTH]
@@ -167,11 +172,6 @@
           [s SOUTH]
           [d EAST]
           [else heading])))
-
-
-
-
-
 
 
 ; Number, Number, Number, Number Number -> Boolean
@@ -282,7 +282,7 @@
        (<= (posn-y point) (+ (hit-box-y hit-box) (/ (hit-box-height hit-box) 2)))
        (>= (posn-y point) (- (hit-box-y hit-box) (/ (hit-box-height hit-box) 2))))
       #t
-      #f))  
+      #f))   
 
  
 ;******************************************************* rendering ****************************************************
@@ -319,8 +319,16 @@
                                     [(= heading 6)"SW"]
                                     [(= heading 7)"W"]
                                     [(= heading 8)"NW"]) 12 "red")
+                        (text (cond [(= desired-heading 1)"Desired Heading: N"]
+                                    [(= desired-heading 2)"Desired Heading: NE"] 
+                                    [(= desired-heading 3)"Desired Heading: E"]
+                                    [(= desired-heading 4)"Desired Heading: SE"] 
+                                    [(= desired-heading 5)"Desired Heading: S"]  
+                                    [(= desired-heading 6)"Desired Heading: SW"]
+                                    [(= desired-heading 7)"Desired Heading: W"]
+                                    [(= desired-heading 8)"Desired Heading: NW"]) 12 "blue")
                         (text (number->string ticks) 12 "green")) 
-                 80 100
+                 80 100 
                  (place-image player-image x y (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background))))) ; final placement 
  
  
@@ -341,15 +349,17 @@
 ; ******************************************************* initial states ************************************************
 (define-struct level [hit-boxes start-position end-hitbox])
 
+(define empty-level
+  (list (make-hit-box 0 0 0 0)))
   
 ;contains each hit-box  
 (define level0
   (list (make-hit-box 25 500 0 250) ; width height x y
         (make-hit-box 800 25 400 0)  
         (make-hit-box 25 25 300 300))) 
-
+ 
 (define level1
-  (list (make-hit-box 100 500 50 250)
+  (list (make-hit-box 100 500 50 250) 
         (make-hit-box 800 100 400 50)   
         (make-hit-box 800 100 600 250))) 
 
@@ -357,17 +367,17 @@
 (define initial-player (make-player WEST
                                     (make-posn 950 ; aligns player on the middle of x-axis
                                                450) ; aligns player on 90% of y-axis
-                                    8
+                                    8 
                                     WEST)) ; initial speed
  
 (define initial-keys (make-keys #f #f #f #f))    
 
-(define initial-world-state (make-world-state initial-player initial-keys level1 0))
+(define initial-world-state (make-world-state initial-player initial-keys empty-level 0))
 
 ; ******************************************************* big bang ***********************************************
 
-(big-bang initial-world-state 
-  (on-tick tock)  
+(big-bang initial-world-state  
+  (on-tick tock 0.1)  
   (to-draw draw)
   (name "walmart celeste")
   (state #f)
