@@ -11,7 +11,7 @@
 (define PLAYER-HITBOX 7)
 
 ; player contains the heading, position & speed of the player character.
-(define-struct player [heading position speed])
+(define-struct player [heading position speed desired-heading])
 
 ; holds the state of each usuable key 
 (define-struct keys [w a s d])
@@ -20,11 +20,33 @@
 (define-struct hit-box [width height x y])
 
 ; worldstate 
-(define-struct world-state [player keyboard hit-box ])
+(define-struct world-state [player keyboard hit-box ticks])
+
+(define-struct abs-heading [left right heading])
+
+;(make-h (make-h south north west) (make-h north south east) north)
+
+(define ticks 0)
+
+(define NORTH 1)
+(define NE 2)
+(define EAST 3)
+(define SE 4)
+(define SOUTH 5)
+(define SW 6)
+(define WEST 7)
+(define NW 8)
+
+
+; Heading, Desired Heading -> Heading
+; Number, Number ->  
+; returns whethe
+
+; problem: always turns right 
 
 ;(define-struct world-state [menu game-play])
 
-;(define-struct game-play [player keyboard hit-box])
+;(define-struct game-play [player keyboard hit-box]) 
 
 ; buttons is a list of all buttons on given screen
 ; screen is the current screen
@@ -33,7 +55,9 @@
  
 
 ;******************************************************* keyboard handling *******************************************************
-
+; new heading
+; keys update desired heading
+; tock moves heading towards desired heading 
 
 ; World State, Key -> World State 
 ; sets key to true when pressed 
@@ -43,7 +67,7 @@
          (define s (keys-s (world-state-keyboard struct)))
          (define d (keys-d (world-state-keyboard struct)))]
    
-   (cond [(key=? input-key "w") (update-keys struct (make-keys #t a s d))]
+   (cond [(key=? input-key "w") (update-keys struct (make-keys #t a s d))] 
          [(key=? input-key "a") (update-keys struct (make-keys w #t s d))]
          [(key=? input-key "s") (update-keys struct (make-keys w a #t d))]   
          [(key=? input-key "d") (update-keys struct (make-keys w a s #t))]
@@ -68,79 +92,158 @@
 ; World State, Keys -> World State
 ; makes a new world state with the given keyboard state 
 (define (update-keys struct new-keys)
-  (make-world-state (world-state-player struct) new-keys (world-state-hit-box struct)))
+  (make-world-state (world-state-player struct)
+                    new-keys
+                    (world-state-hit-box struct)
+                    (world-state-ticks struct)))
+
+
 
 
 ;******************************************************* on-tick / movement *******************************************************
 
-
 ; World State -> World State 
 ; updates heading and position of the player 
 (define (tock struct)
- (local [(define heading (player-heading (world-state-player struct)))
-         (define new-heading (heading-handler struct))
-         (define position (player-position (world-state-player struct)))
-         (define new-position (change-position (world-state-player struct)))
-         (define speed (player-speed (world-state-player struct)))
-         (define hit-boxes (world-state-hit-box struct))]
-   
-   (cond [(colliding? position PLAYER-HITBOX hit-boxes); if player is colliding w/ hitbox
-          (make-world-state (make-player heading position speed) ; freeze player 
-                            (world-state-keyboard struct)
-                            (world-state-hit-box struct))] 
-         
-         [else (make-world-state (make-player new-heading new-position speed) ; updates player
-                                 (world-state-keyboard struct)
-                                 (world-state-hit-box struct))]))) ; retains keyboard
- 
 
-; World State -> String
+         ; shorthand 
+ (local [(define current-heading (player-heading (world-state-player struct)))
+         (define current-desired-heading (player-desired-heading (world-state-player struct)))
+         (define position (player-position (world-state-player struct)))
+         (define speed (player-speed (world-state-player struct)))
+         (define hit-boxes (world-state-hit-box struct))
+         
+         (define ticks (+ 1 (world-state-ticks struct)))
+
+         ; mutated values
+         ;(define new-heading (heading-handler current-heading current-desired-heading ticks))
+         (define new-heading (desired-heading-handler struct))
+         (define new-desired-heading (desired-heading-handler struct)) ; changes heading based upon which keys are pressed 
+         (define new-position (change-position current-heading position speed))] ;changes the players position based upon heading and speed
+
+  
+   
+   (cond [(colliding? position PLAYER-HITBOX hit-boxes) 
+          
+          (update-player-and-ticks struct
+                                   ticks
+                                   (make-player current-heading
+                                                position
+                                                speed
+                                                current-heading))] ; freeze player
+         
+         [else (update-player-and-ticks struct
+                                        ticks
+                                        (make-player new-heading
+                                                     new-position
+                                                     speed
+                                                     new-desired-heading))]))) 
+
+
+(define (update-player-and-ticks struct ticks new-player)
+  (make-world-state new-player
+                    (world-state-keyboard struct)
+                    (world-state-hit-box struct)
+                    ticks))
+
+;(define (heading-handler current-heading desired-heading ticks)
+  
+
+; World State -> String 
 ; changes the heading based upon which keys are pressed. 
-(define (heading-handler struct)
+(define (desired-heading-handler struct)
   (local [(define w (keys-w (world-state-keyboard struct)))
-          (define a (keys-a (world-state-keyboard struct)))
+          (define a (keys-a (world-state-keyboard struct))) 
           (define s (keys-s (world-state-keyboard struct)))
           (define d (keys-d (world-state-keyboard struct)))
           (define heading (player-heading (world-state-player struct)))]
     
-    (cond [(and w d) "NE"]
-          [(and d s) "SE"]
-          [(and s a) "SW"]
-          [(and a w) "NW"]  
-          [w "NORTH"]
-          [a "WEST"]
-          [s "SOUTH"]
-          [d "EAST"]
-          [else heading])))  
+    (cond [(and w d) NE]
+          [(and d s) SE]
+          [(and s a) SW]
+          [(and a w) NW]  
+          [w NORTH]
+          [a WEST]
+          [s SOUTH]
+          [d EAST]
+          [else heading])))
+
+
+
+
+
+
+
+; Number, Number, Number, Number Number -> Boolean
+; returns whether turning left is the shortest path to the desired heading 
+(define (turn-left? current-heading desired-heading max-heading min-heading)
+  (cond [(< (count-left-turns current-heading desired-heading max-heading min-heading)
+            (count-right-turns current-heading desired-heading max-heading min-heading))
+         #true]
+        [else #false]))
+
+
+; Number, Number, Number -> Number 
+; Counts the number of left turns required to reach a desried heading.
+(define (count-left-turns current-heading desired-heading max-heading min-heading)
+  (cond [(= current-heading desired-heading) 0]
+        [else (+ 1 (count-left-turns (turn-left current-heading max-heading min-heading)
+                                     desired-heading
+                                     max-heading
+                                     min-heading))])) 
+ 
+   
+; Number, Number, Number -> Number
+; Counts the number of right turns required to reach a desired heading. 
+(define (count-right-turns current-heading desired-heading max-heading min-heading) 
+  (cond [(= current-heading desired-heading) 0]
+        [else (+ 1 (count-right-turns (turn-right current-heading max-heading min-heading)
+                                      desired-heading
+                                      max-heading
+                                      min-heading))])) 
+
+
+; Number, Number -> Number
+; moves the heading to the right  
+(define (turn-right current-heading max-heading min-heading)
+  (cond [(= current-heading max-heading) min-heading]
+        [else (+ 1 current-heading)]))
+ 
+
+; Number, Number -> Number
+; moves the heading to the left 
+(define (turn-left current-heading max-heading min-heading)
+  (cond [(= current-heading min-heading) max-heading]
+        [else (- current-heading 1)]))
 
 
 ; Player Structure -> Posn
-; changes the position of the player based upon the current heading and speed
-(define (change-position struct)
-  (local [(define heading (player-heading struct))
-          (define x (posn-x (player-position struct)))
-          (define y (posn-y (player-position struct)))
-          (define speed (player-speed struct))
+; changes the position of the player based upon the current heading, position, and  speed
+(define (change-position current-heading position speed)
+  (local [(define x (posn-x position))
+          (define y (posn-y position))
           (define diagonal-speed (ceiling (percentage 70 speed)))] ; 70 percent of speed in each direction approximates
                                                                 ; a diagonal speed equal to speed
 
-    (cond [(equal? heading "NORTH") (make-posn x (- y speed))]
-          [(equal? heading "SOUTH") (make-posn x (+ y speed))]
-          [(equal? heading "WEST")  (make-posn (- x speed) y)]
-          [(equal? heading "EAST")  (make-posn (+ x speed) y)]
+    (cond [(equal? current-heading NORTH) (make-posn x (- y speed))]
+          [(equal? current-heading SOUTH) (make-posn x (+ y speed))]
+          [(equal? current-heading WEST)  (make-posn (- x speed) y)]
+          [(equal? current-heading EAST)  (make-posn (+ x speed) y)]
           
-          [(equal? heading "NE") (make-posn (+ x diagonal-speed) (- y diagonal-speed))]
-          [(equal? heading "NW") (make-posn (- x diagonal-speed) (- y diagonal-speed))]
-          [(equal? heading "SE") (make-posn (+ x diagonal-speed) (+ y diagonal-speed))]
-          [(equal? heading "SW") (make-posn (- x diagonal-speed) (+ y diagonal-speed))]
-          [else (print struct)]))) 
+          [(equal? current-heading NE) (make-posn (+ x diagonal-speed) (- y diagonal-speed))]
+          [(equal? current-heading NW) (make-posn (- x diagonal-speed) (- y diagonal-speed))]
+          [(equal? current-heading SE) (make-posn (+ x diagonal-speed) (+ y diagonal-speed))]
+          [(equal? current-heading SW) (make-posn (- x diagonal-speed) (+ y diagonal-speed))]
+          [else (print "bitchbitchbitch")]))) 
 
 
 ; Number, Number -> Number
 ; returns the given percentage of a number 
 (define (percentage percent number)
-  (* (/ percent 10) (/ number 10)))  
- 
+  (* (/ percent 10) (/ number 10)))
+
+
+
 
 ;**************************************************** collision ****************************************************
 
@@ -187,31 +290,41 @@
 ; World State -> Image
 ; Given the Player Structure, struct, returns an image of the playerable character at the Player Structure's coordinates. 
 (define (draw struct)
-  (local [(define x (posn-x (player-position (world-state-player struct))))
+  (local [(define x (posn-x (player-position (world-state-player struct)))) 
           (define y (posn-y (player-position (world-state-player struct))))
 
           
           (define heading (player-heading (world-state-player struct)))
-          (define player-image (square (* 2 PLAYER-HITBOX) 'outline 'red))  ; (* PLAYER-HITBOX (sqrt 2))
-          (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'gray))
+          (define desired-heading (player-desired-heading (world-state-player struct)))
+          (define player-image (square (* 2 PLAYER-HITBOX) "solid" "red"))  ; (* PLAYER-HITBOX (sqrt 2))
+          (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT "solid" 'gray))
             
           (define w (keys-w (world-state-keyboard struct)))
           (define a (keys-a (world-state-keyboard struct)))
           (define s (keys-s (world-state-keyboard struct)))
           (define d (keys-d (world-state-keyboard struct)))
           
-          (define hit-boxes (world-state-hit-box struct))]
+          (define hit-boxes (world-state-hit-box struct))
+          (define ticks (world-state-ticks struct))]
     
-    (place-image (above (text (if w "#t" "#f") 12 "olive") 
-                        (text (if a "#t" "#f") 12 "olive")
-                        (text (if s "#t" "#f") 12 "olive")
-                        (text (if d "#t" "#f") 12 "olive") 
-                        (text heading 12 "olive")) 
-                 100 100
+    (place-image (above (text (if w "W: #T" "W: #F") 12 "red")  
+                        (text (if a "A: #T" "A: #F") 12 "red")
+                        (text (if s "S: #T" "S: #F") 12 "red")
+                        (text (if d "D: #T" "D: #F") 12 "red") 
+                        (text (cond [(= heading 1)"N"]
+                                    [(= heading 2)"NE"]
+                                    [(= heading 3)"E"]
+                                    [(= heading 4)"SE"] 
+                                    [(= heading 5)"S"]  
+                                    [(= heading 6)"SW"]
+                                    [(= heading 7)"W"]
+                                    [(= heading 8)"NW"]) 12 "red")
+                        (text (number->string ticks) 12 "green")) 
+                 80 100
                  (place-image player-image x y (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background))))) ; final placement 
  
-
-
+ 
+ 
       
 ; list of hit-boxes -> list of posns
 ; generates a list of posns based upon the list of hit-boxes
@@ -222,12 +335,14 @@
 ; list of hit-boxes -> list of rectangles  
 ; generates a list of rectangles based upon the list of hit-boxes 
 (define (generate-rectangles hit-boxes)
-  (map (lambda (hit-box) (rectangle (hit-box-width hit-box) (hit-box-height hit-box) 'outline 'blue)) hit-boxes))
+  (map (lambda (hit-box) (rectangle (hit-box-width hit-box) (hit-box-height hit-box) 'solid 'blue)) hit-boxes))
 
 
 ; ******************************************************* initial states ************************************************
+(define-struct level [hit-boxes start-position end-hitbox])
 
-;contains each hit-box 
+  
+;contains each hit-box  
 (define level0
   (list (make-hit-box 25 500 0 250) ; width height x y
         (make-hit-box 800 25 400 0)  
@@ -236,17 +351,18 @@
 (define level1
   (list (make-hit-box 100 500 50 250)
         (make-hit-box 800 100 400 50)   
-        (make-hit-box 800 100 600 250)))  
+        (make-hit-box 800 100 600 250))) 
 
-; the initial state of the playable character.  
-(define initial-player (make-player "WEST"
+; the initial state of the playable character. 
+(define initial-player (make-player WEST
                                     (make-posn 950 ; aligns player on the middle of x-axis
                                                450) ; aligns player on 90% of y-axis
-                                    8)) ; initial speed
+                                    8
+                                    WEST)) ; initial speed
  
-(define initial-keys (make-keys #f #f #f #f))  
+(define initial-keys (make-keys #f #f #f #f))    
 
-(define initial-world-state (make-world-state initial-player initial-keys level1))
+(define initial-world-state (make-world-state initial-player initial-keys level1 0))
 
 ; ******************************************************* big bang ***********************************************
 
