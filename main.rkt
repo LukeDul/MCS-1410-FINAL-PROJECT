@@ -102,7 +102,7 @@
  (local [(define keyboard-state (world-state-keyboard struct))
          (define current-heading (player-heading (world-state-player struct)))
          (define current-desired-heading (player-desired-heading (world-state-player struct)))
-         (define position (player-position (world-state-player struct)))
+         (define current-player-position (player-position (world-state-player struct)))
          (define speed (player-speed (world-state-player struct)))
          (define hit-boxes (world-state-hit-box struct)) 
 
@@ -110,31 +110,43 @@
          (define ticks (+ 1 (world-state-ticks struct)))
 
          ; turns the heading towards the desired heading 
-         (define new-heading (turn-heading current-heading current-desired-heading NW NORTH))
+         (define new-heading (turn-heading current-heading
+                                           current-desired-heading
+                                           NW
+                                           NORTH))
 
-         ; changes desired-heading based upon which keys are pressed
-         (define new-desired-heading (desired-heading-handler keyboard-state current-desired-heading))
+         ; Changes desired-heading based upon which keys are pressed.
+         (define new-desired-heading (desired-heading-handler keyboard-state
+                                                              current-desired-heading))
 
-         ; changes the players position based upon the current heading and speed
-         (define new-position (change-position current-heading position speed))]
+         ; Changes the players position based upon the current heading, position and speed.
+         (define new-player-position (change-position current-heading
+                                                      current-player-position
+                                                      speed))]
   
-   
-   (cond [(colliding? position PLAYER-HITBOX hit-boxes) ; if player is colliding w/ a hitbox  
-          
+         ; if player is colliding w/ a hitbox 
+   (cond [(colliding? current-player-position
+                      PLAYER-HITBOX 
+                      hit-boxes)  
+
+          ; freeze player
           (update-player-and-ticks struct
                                    ticks
                                    (make-player current-heading
-                                                position
+                                                current-player-position
                                                 speed
-                                                current-heading))] ; freeze player
-         
-         [else (update-player-and-ticks struct
-                                        ticks
-                                        (make-player new-heading
-                                                     new-position
-                                                     speed
-                                                     new-desired-heading))]))) 
+                                                current-heading))] 
+         ; otherwise continue as normal  
+         [else (cond [(= 4 ticks)
+                      (update-player-and-ticks struct 0 (make-player new-heading new-player-position speed new-desired-heading))]
+
+                     [else
+                      (update-player-and-ticks struct ticks  (make-player current-heading new-player-position speed new-desired-heading))])])))
+            
  
+; Number, Number, Number -> Number, Number 
+; if a number, ticks, is large enough, turns the player, otherwise, leaves it as is.
+
 
 ; World State, Number, Player State -> World State
 ; short-hand function for updating the Player State and Ticks within the World State
@@ -279,7 +291,7 @@
        (<= (posn-y point) (+ (hit-box-y hit-box) (/ (hit-box-height hit-box) 2)))
        (>= (posn-y point) (- (hit-box-y hit-box) (/ (hit-box-height hit-box) 2))))
       #t 
-      #f))   
+      #f))    
 
 ;******************************************************* rendering ****************************************************
  
