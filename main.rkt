@@ -11,7 +11,7 @@
 (define PLAYER-HITBOX 7)
 
 ; player contains the heading, position & speed of the player character.
-(define-struct player [heading position speed desired-heading])
+(define-struct player [heading position speed desired-heading]) 
 
 ; holds the state of each usuable key 
 (define-struct keys [w a s d])
@@ -23,10 +23,11 @@
 (define-struct menu [buttons])
 
 ; worldstate 
-(define-struct world-state [player keyboard hit-box ticks])
+(define-struct world-state [player keyboard level ticks])
 
-; List, Posn, hit-box, hit-box 
-(define-struct level-state [hit-box start-point-position end-box-position save-box-position])
+
+
+
 
 (define NORTH 1)
 (define NE 2)
@@ -121,11 +122,13 @@ Level State
 (define (update-keys struct new-keys)
   (make-world-state (world-state-player struct)
                     new-keys
-                    (world-state-hit-box struct)
+                    (world-state-level struct)
                     (world-state-ticks struct)))
 
 
 ;******************************************************* on-tick / movement *******************************************************
+
+
 
 ; World State -> World State 
 ; updates heading and position of the player 
@@ -137,7 +140,9 @@ Level State
          (define current-desired-heading (player-desired-heading (world-state-player struct)))
          (define current-player-position (player-position (world-state-player struct)))
          (define speed (player-speed (world-state-player struct)))
-         (define hit-boxes (world-state-hit-box struct)) 
+         (define hit-boxes (level-state-hit-boxes (world-state-level struct)))
+         (define end-box (level-state-end-box (world-state-level struct)))
+         (define save-box (level-state-save-box (world-state-level struct)))
 
          ; increments ticks 
          (define ticks (+ 1 (world-state-ticks struct)))
@@ -158,9 +163,7 @@ Level State
                                                       speed))]
   
          ; if player is colliding w/ a hitbox 
-   (cond [(colliding? current-player-position
-                      PLAYER-HITBOX 
-                      hit-boxes)  
+   (cond [(colliding? current-player-position PLAYER-HITBOX hit-boxes)  
 
           ; freeze player
           (update-player-and-ticks struct
@@ -168,7 +171,32 @@ Level State
                                    (make-player current-heading
                                                 current-player-position
                                                 speed
-                                                current-heading))] 
+                                                current-heading))]
+         
+
+         ; if player is colliding w/ the end box 
+         [(colliding? current-player-position PLAYER-HITBOX (list end-box))
+
+                   ; freeze player
+          (update-player-and-ticks struct
+                                   ticks
+                                   (make-player current-heading
+                                                current-player-position
+                                                speed
+                                                current-heading))]
+         
+
+         ; if player is colliding w/ the save box 
+         [(colliding? current-player-position PLAYER-HITBOX (list save-box))
+
+                   ; freeze player 
+          (update-player-and-ticks struct
+                                   ticks
+                                   (make-player current-heading
+                                                current-player-position
+                                                speed
+                                                current-heading))]
+                     
          ; otherwise continue as normal  
          [else (cond [(= 3 ticks)
                       (update-player-and-ticks struct 0 (make-player new-heading new-player-position speed new-desired-heading))]
@@ -186,7 +214,7 @@ Level State
 (define (update-player-and-ticks struct ticks new-player-state)
   (make-world-state new-player-state
                     (world-state-keyboard struct)
-                    (world-state-hit-box struct)
+                    (world-state-level struct)
                     ticks))
 
 
@@ -290,7 +318,7 @@ Level State
 
 
 ; List of hit-boxes, Posn, Number  -> Boolean
-; checks if a square surrounding a point with width & height size is colliding w/ any hit-box in the list, hit-boxes
+; checks if a square surrounding a point with width & height size is colliding w/ any hit-box in a list, hit-boxes
 (define (colliding? point size hit-boxes)
   (cond [(empty? hit-boxes) #false]
         [(square-collision? point size (first hit-boxes)) #true]
@@ -327,7 +355,10 @@ Level State
       #f))    
 
 ;******************************************************* rendering ****************************************************
- 
+
+; List, Posn, hit-box, hit-box 
+(define-struct level-state [hit-boxes start-point-position end-box save-box])
+
 ; World State -> Image
 ; Given the Player Structure, struct, returns an image of the playerable character at the Player Structure's coordinates. 
 (define (draw struct)
@@ -335,13 +366,23 @@ Level State
           (define y (posn-y (player-position (world-state-player struct))))
           (define player-image (square (* 2 PLAYER-HITBOX) "solid" "red"))  ; (* PLAYER-HITBOX (sqrt 2))
           (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT "solid" 'gray))
-          (define hit-boxes (world-state-hit-box struct))] 
+          (define hit-boxes (level-state-hit-boxes (world-state-level struct)))
+          
+          (define end-box (level-state-end-box (world-state-level struct)))
+          (define end-box-image (rectangle (hit-box-width end-box) (hit-box-height end-box) 'outline 'red))
+
+          
+          (define save-box (level-state-save-box (world-state-level struct)))
+          (define save-box-image (rectangle (hit-box-width save-box) (hit-box-height save-box) 'outline 'green))] 
     
     (place-image (debugger struct)
                  80 100 
                  (place-image player-image
                               x y
-                              (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background))))) ; final placement 
+                              (place-images (list end-box-image save-box-image)
+                                            (list (make-posn (hit-box-x end-box) (hit-box-y end-box))
+                                                  (make-posn (hit-box-x save-box) (hit-box-y save-box)))
+                                            (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background)))))) ; final placement 
 
 
 ; list of hit-boxes -> list of posns
@@ -402,28 +443,37 @@ Level State
 
 (define empty-level
   (list (make-hit-box 0 0 0 0)))
+
+(define level0-hit-boxes
+  (list (make-hit-box 100 500 50 250)
+        (make-hit-box 800 100 400 50)    
+        (make-hit-box 800 100 600 250)))
   
 ;contains each hit-box  
-(define level0
-  (list (make-hit-box 25 500 0 250) ; width height x y
+(define level1
+  (list (make-hit-box 25 500 0 250) ; width height x y 
         (make-hit-box 800 25 400 0)  
         (make-hit-box 25 25 300 300)))  
  
-(define level1
-  (list (make-hit-box 100 500 50 250) 
-        (make-hit-box 800 100 400 50)   
-        (make-hit-box 800 100 600 250))) 
+
+(define level0-end-box (make-hit-box 80 40 900 40)) 
+
+(define level0-save-box (make-hit-box 80 80 150 240))
+
+(define level0-start-posn (make-posn 950 450))
+
+(define level0 (make-level-state level0-hit-boxes level0-start-posn level0-end-box level0-save-box))
 
 ; the initial state of the playable character. 
 (define initial-player (make-player WEST
                                     (make-posn 950 ; aligns player on the middle of x-axis
                                                450) ; aligns player on 90% of y-axis
-                                    8 
+                                    8  
                                     WEST)) ; initial speed
  
 (define initial-keys (make-keys #f #f #f #f))    
 
-(define initial-world-state (make-world-state initial-player initial-keys level1 0)) 
+(define initial-world-state (make-world-state initial-player initial-keys level0 0)) 
 
 ; ******************************************************* big bang ***********************************************
 
