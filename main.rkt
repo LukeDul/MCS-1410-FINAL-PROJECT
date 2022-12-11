@@ -51,9 +51,7 @@
  
 
 ;******************************************************* keyboard handling *******************************************************
-; new heading
-; keys update desired heading
-; tock moves heading towards desired heading 
+
 
 ; World State, Key -> World State 
 ; sets key to true when pressed 
@@ -106,17 +104,21 @@
          (define position (player-position (world-state-player struct)))
          (define speed (player-speed (world-state-player struct)))
          (define hit-boxes (world-state-hit-box struct))
-         
+
+         ; increments ticks 
          (define ticks (+ 1 (world-state-ticks struct)))
 
-         ; mutated values
+         ; turns the heading towards the desired heading 
          (define new-heading (turn-heading current-heading current-desired-heading NW NORTH))
-         (define new-desired-heading (desired-heading-handler struct)) ; changes heading based upon which keys are pressed 
-         (define new-position (change-position current-heading position speed))] ;changes the players position based upon heading and speed
 
+         ; changes desired-heading based upon which keys are pressed
+         (define new-desired-heading (desired-heading-handler struct)) 
+
+         ; changes the players position based upon the current heading and speed
+         (define new-position (change-position current-heading position speed))]
   
    
-   (cond [(colliding? position PLAYER-HITBOX hit-boxes) 
+   (cond [(colliding? position PLAYER-HITBOX hit-boxes) ; if player is colliding w/ a hitbox  
           
           (update-player-and-ticks struct
                                    ticks
@@ -131,10 +133,12 @@
                                                      new-position
                                                      speed
                                                      new-desired-heading))]))) 
+ 
 
-
-(define (update-player-and-ticks struct ticks new-player)
-  (make-world-state new-player
+; World State, Number, Player State -> World State
+; short-hand function for updating the Player State and Ticks within the World State
+(define (update-player-and-ticks struct ticks new-player-state)
+  (make-world-state new-player-state
                     (world-state-keyboard struct)
                     (world-state-hit-box struct)
                     ticks))
@@ -239,6 +243,7 @@
 
 ;**************************************************** collision ****************************************************
 
+
 ; List of hit-boxes, Posn, Number  -> Boolean
 ; checks if a square surrounding a point with width & height size is colliding w/ any hit-box in the list, hit-boxes
 (define (colliding? point size hit-boxes)
@@ -261,7 +266,7 @@
        (point-collision? (make-posn (- (posn-x point) size) (- (posn-y point) size)) hit-box) ; bottom left 
        (point-collision? (make-posn (+ (posn-x point) size) (- (posn-y point) size)) hit-box) ; bottom right 
        )
-      #t
+      #t 
       #f)) 
 
 
@@ -289,9 +294,25 @@
     
     (place-image (debugger struct)
                  80 100 
-                 (place-image player-image x y (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background))))) ; final placement 
- 
- 
+                 (place-image player-image
+                              x y
+                              (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background))))) ; final placement 
+
+
+; list of hit-boxes -> list of posns
+; generates a list of posns based upon the list of hit-boxes
+(define (generate-posns hit-boxes)
+  (map (lambda (hit-box) (make-posn (hit-box-x hit-box) (hit-box-y hit-box))) hit-boxes))
+                    
+                    
+; list of hit-boxes -> list of rectangles  
+; generates a list of rectangles based upon the list of hit-boxes 
+(define (generate-rectangles hit-boxes)
+  (map (lambda (hit-box) (rectangle (hit-box-width hit-box) (hit-box-height hit-box) 'solid 'blue)) hit-boxes))
+
+
+; World State -> Image
+; displays various values from the World State for debugging 
 (define (debugger struct)
   (local [(define heading (player-heading (world-state-player struct)))
           (define desired-heading (player-desired-heading (world-state-player struct)))
@@ -325,17 +346,6 @@
                        [(= desired-heading 7)"Desired Heading: W"]
                        [(= desired-heading 8)"Desired Heading: NW"]) 12 "yellow")
            (text (number->string ticks) 12 "green")))) 
-      
-; list of hit-boxes -> list of posns
-; generates a list of posns based upon the list of hit-boxes
-(define (generate-posns hit-boxes)
-  (map (lambda (hit-box) (make-posn (hit-box-x hit-box) (hit-box-y hit-box))) hit-boxes))
-                    
-                    
-; list of hit-boxes -> list of rectangles  
-; generates a list of rectangles based upon the list of hit-boxes 
-(define (generate-rectangles hit-boxes)
-  (map (lambda (hit-box) (rectangle (hit-box-width hit-box) (hit-box-height hit-box) 'solid 'blue)) hit-boxes))
 
 
 ; ******************************************************* initial states ************************************************
