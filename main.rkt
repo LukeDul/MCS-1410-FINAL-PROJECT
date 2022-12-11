@@ -24,10 +24,6 @@
 
 (define-struct abs-heading [left right heading])
 
-;(make-h (make-h south north west) (make-h north south east) north)
-
-(define ticks 0)
-
 (define NORTH 1)
 (define NE 2)
 (define EAST 3)
@@ -96,8 +92,6 @@
                     new-keys
                     (world-state-hit-box struct)
                     (world-state-ticks struct)))
-
-
 
 
 ;******************************************************* on-tick / movement *******************************************************
@@ -243,8 +237,6 @@
   (* (/ percent 10) (/ number 10)))
 
 
-
-
 ;**************************************************** collision ****************************************************
 
 ; List of hit-boxes, Posn, Number  -> Boolean
@@ -284,7 +276,6 @@
       #t
       #f))   
 
- 
 ;******************************************************* rendering ****************************************************
  
 ; World State -> Image
@@ -292,47 +283,48 @@
 (define (draw struct)
   (local [(define x (posn-x (player-position (world-state-player struct)))) 
           (define y (posn-y (player-position (world-state-player struct))))
-
-          
-          (define heading (player-heading (world-state-player struct)))
-          (define desired-heading (player-desired-heading (world-state-player struct)))
           (define player-image (square (* 2 PLAYER-HITBOX) "solid" "red"))  ; (* PLAYER-HITBOX (sqrt 2))
           (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT "solid" 'gray))
-            
-          (define w (keys-w (world-state-keyboard struct)))
-          (define a (keys-a (world-state-keyboard struct)))
-          (define s (keys-s (world-state-keyboard struct)))
-          (define d (keys-d (world-state-keyboard struct)))
-          
-          (define hit-boxes (world-state-hit-box struct))
-          (define ticks (world-state-ticks struct))]
+          (define hit-boxes (world-state-hit-box struct))] 
     
-    (place-image (above (text (if w "W: #T" "W: #F") 12 "red")  
-                        (text (if a "A: #T" "A: #F") 12 "red")
-                        (text (if s "S: #T" "S: #F") 12 "red")
-                        (text (if d "D: #T" "D: #F") 12 "red") 
-                        (text (cond [(= heading 1)"N"]
-                                    [(= heading 2)"NE"]
-                                    [(= heading 3)"E"]
-                                    [(= heading 4)"SE"] 
-                                    [(= heading 5)"S"]  
-                                    [(= heading 6)"SW"]
-                                    [(= heading 7)"W"]
-                                    [(= heading 8)"NW"]) 12 "red")
-                        (text (cond [(= desired-heading 1)"Desired Heading: N"]
-                                    [(= desired-heading 2)"Desired Heading: NE"] 
-                                    [(= desired-heading 3)"Desired Heading: E"]
-                                    [(= desired-heading 4)"Desired Heading: SE"] 
-                                    [(= desired-heading 5)"Desired Heading: S"]  
-                                    [(= desired-heading 6)"Desired Heading: SW"]
-                                    [(= desired-heading 7)"Desired Heading: W"]
-                                    [(= desired-heading 8)"Desired Heading: NW"]) 12 "blue")
-                        (text (number->string ticks) 12 "green")) 
+    (place-image (debugger struct)
                  80 100 
                  (place-image player-image x y (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background))))) ; final placement 
  
  
- 
+(define (debugger struct)
+  (local [(define heading (player-heading (world-state-player struct)))
+          (define desired-heading (player-desired-heading (world-state-player struct)))
+          (define y (posn-y (player-position (world-state-player struct))))
+          (define x (posn-x (player-position (world-state-player struct))))
+          (define ticks (world-state-ticks struct))
+          (define w (keys-w (world-state-keyboard struct)))  
+          (define a (keys-a (world-state-keyboard struct)))
+          (define s (keys-s (world-state-keyboard struct)))
+          (define d (keys-d (world-state-keyboard struct)))]
+    (above (text (if w "W: #T" "W: #F") 12 "red")
+           (text (if a "A: #T" "A: #F") 12 "red") 
+           (text (if s "S: #T" "S: #F") 12 "red")
+           (text (if d "D: #T" "D: #F") 12 "red") 
+           (text (number->string x) 12 "orange")
+           (text (number->string y) 12 "orange")
+           (text (cond [(= heading 1)"Current Heading: N"]
+                       [(= heading 2)"Current Heading: NE"]
+                       [(= heading 3)"Current Heading: E"]
+                       [(= heading 4)"Current Heading: SE"] 
+                       [(= heading 5)"Current Heading: S"]  
+                       [(= heading 6)"Current Heading: SW"]
+                       [(= heading 7)"Current Heading: W"]
+                       [(= heading 8)"Current Heading: NW"]) 12 "red")
+           (text (cond [(= desired-heading 1)"Desired Heading: N"]
+                       [(= desired-heading 2)"Desired Heading: NE"] 
+                       [(= desired-heading 3)"Desired Heading: E"]
+                       [(= desired-heading 4)"Desired Heading: SE"] 
+                       [(= desired-heading 5)"Desired Heading: S"]
+                       [(= desired-heading 6)"Desired Heading: SW"]
+                       [(= desired-heading 7)"Desired Heading: W"]
+                       [(= desired-heading 8)"Desired Heading: NW"]) 12 "yellow")
+           (text (number->string ticks) 12 "green")))) 
       
 ; list of hit-boxes -> list of posns
 ; generates a list of posns based upon the list of hit-boxes
@@ -372,14 +364,14 @@
  
 (define initial-keys (make-keys #f #f #f #f))    
 
-(define initial-world-state (make-world-state initial-player initial-keys empty-level 0))
+(define initial-world-state (make-world-state initial-player initial-keys level1 0)) 
 
 ; ******************************************************* big bang ***********************************************
 
 (big-bang initial-world-state  
-  (on-tick tock 0.1)  
+  (on-tick tock)  
   (to-draw draw)
-  (name "walmart celeste")
+  (name "walmart celeste") 
   (state #f)
   (on-key press-handler)
   (on-release release-handler)) 
