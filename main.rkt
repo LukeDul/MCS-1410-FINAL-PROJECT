@@ -12,9 +12,6 @@
 ; size of the player's hitbox 
 (define PLAYER-HITBOX 7) 
 
-; tiucks 
-(define TURN-RADIUS-CONSTANT 4)
-
 ; player contains the heading, position & speed of the player character.
 (define-struct player [heading position speed desired-heading]) 
 
@@ -24,23 +21,43 @@
 ; contains the width, height, and position of a hitbox 
 (define-struct hit-box [width height x y])
 
-;
-(define-struct menu [button open?])
+; open? is a boolean
+(define-struct menu [button-list open?])
+
+(define-struct button [width height x y action])
 
 ; List, Posn, hit-box, hit-box 
 (define-struct level-state [hit-boxes start-posn end-box save-box running?])
 
 ; worldstate 
-(define-struct world-state [player keyboard level menu ticks])
+(define-struct world-state [player keyboard level menu ticks]) 
 
 (define NORTH 1)
 (define NE 2)
-(define EAST 3)
+(define EAST 3) 
 (define SE 4)
 (define SOUTH 5)
 (define SW 6)
 (define WEST 7)
-(define NW 8)  
+(define NW 8)
+
+;******************************************************* MOUSE-HANDLING *******************************************************
+
+(define start-button (make-button 100 60 500 250 "start" (toggle-gameplay/menu struct #true #false)))
+
+(define level-1-button (make-button "level1 button" 100 60 500 180))
+
+(define title-menu-buttons (list start-button level-1-button)) 
+
+(define title-menu (make-menu title-menu buttons #true))
+
+; World-State, Number, Number, Mouse-Event -> World-State
+(define (mouse-handler struct mouse-x mouse-y mouse-event)
+  (local [(define button (first (menu-button-list (world-state-menu struct))))
+          (define action (button-action (first (menu-button-list)] 
+    
+    (cond [(and (point-collision? (make-posn mouse-x mouse-y) button) (mouse=? mouse-event "button-down")) ]
+          [else struct])))
 
 
 ;******************************************************* keyboard handling *******************************************************
@@ -58,6 +75,7 @@
          [(key=? input-key "a") (update-keys struct (make-keys w #t s d))]
          [(key=? input-key "s") (update-keys struct (make-keys w a #t d))]   
          [(key=? input-key "d") (update-keys struct (make-keys w a s #t))]
+        ; [(key=? input-key "escape") ] ; open menu 
          [else struct])))  
 
 
@@ -73,6 +91,7 @@
          [(key=? input-key "a") (update-keys struct (make-keys w #f s d))]
          [(key=? input-key "s") (update-keys struct (make-keys w a #f d))]   
          [(key=? input-key "d") (update-keys struct (make-keys w a s #f))]
+        [(key=? input-key "escape") (toggle-gameplay/menu struct #false #true )] ; open menu 
          [else struct]))) 
 
 
@@ -84,19 +103,6 @@
                     (world-state-level struct)
                     (world-state-menu struct)
                     (world-state-ticks struct)))
-
-
-;******************************************************* MOUSE-HANDLING *******************************************************
-
-
-(define-struct button [posn width height pointer]) 
-
-; World-State, Number, Number, Mouse-Event -> World-State
-(define (mouse-handler struct mouse-x mouse-y mouse-event)
-  (local [(define button (menu-button (world-state-menu struct)))]
-    
-    (cond [(false? (and (point-collision? (make-posn mouse-x mouse-y) button) (mouse=? mouse-event "button-down"))) struct]
-          [else (toggle-gameplay/menu struct #true #false)])))
 
 
 ;******************************************************* MENU-HANDLING *******************************************************
@@ -115,7 +121,7 @@
 ; Menu, Boolean -> Menu
 ; opens or closes a menu  
 (define (toggle-menu struct open/close)
-  (make-menu (menu-button struct)
+  (make-menu (menu-button-list struct)
              open/close))
 
 
@@ -131,6 +137,10 @@
 
 ;******************************************************* TOCK *******************************************************
 
+(define (ender struct)
+   (local [(define current-player-position (player-position (world-state-player struct)))
+           (define end-box (level-state-end-box (world-state-level struct)))]
+  (if (colliding? current-player-position PLAYER-HITBOX (list end-box)) #t #f)))
 
 ; World State -> World State 
 ; updates heading and position of the player  
@@ -150,7 +160,7 @@
          (define start-posn (level-state-start-posn (world-state-level struct)))
          (define running? (level-state-running? (world-state-level struct)))
          
-         (define button (menu-button (world-state-menu struct)))
+         (define button (menu-button-list (world-state-menu struct)))
          (define open? (menu-open? (world-state-menu struct)))
  
 
@@ -169,27 +179,37 @@
  
    (cond [(false? running?) struct]
          
-         ;*************************************** Game-play ********************************************
+         ;---------------------------------------- Game-play ----------------------------------
          
-               ; if player is colliding w/ a hitbox move player to start coordinates 
+               ; if player is colliding w/ a hitbox move player to start coordinates  
          [else (cond [(colliding? current-player-position PLAYER-HITBOX hit-boxes)
                       (update-player-and-ticks struct ticks (make-player NORTH start-posn speed NORTH))] 
 
                 ; if player is colliding w/ the end box open level select
                 [(colliding? current-player-position PLAYER-HITBOX (list end-box))
-                 (update-player-and-ticks struct ticks (make-player current-heading current-player-position speed current-heading))]
+                 (toggle-gameplay/menu struct #false #true )]
+                 ;(update-player-and-ticks struct ticks (make-player current-heading current-player-position speed current-heading))]
 
-                ; if player is colliding w/ the save box set start coordinates to save-box coordinates 
+                ; if player is colliding w/ the save box set start coordinates to save-box coordinates & continue movement 
                 [(colliding? current-player-position PLAYER-HITBOX (list save-box))
-                 (make-world-state   (cond [(<= TURN-RADIUS-CONSTANT ticks) (make-player new-heading new-player-position speed new-desired-heading)]
-                                           [else (make-player current-heading new-player-position speed new-desired-heading)])
+                 (make-world-state   (cond [(<= TURN-CONSTANT ticks)
+                                            (make-player new-heading new-player-position speed new-desired-heading)]
+                                           [else
+                                            (make-player current-heading new-player-position speed new-desired-heading)])
+                                     
                                      (world-state-keyboard struct)
                                      (make-level-state hit-boxes (make-posn (hit-box-x save-box) (hit-box-y save-box)) end-box save-box running?)
                                      (world-state-menu struct)
-                                     (if (<= TURN-RADIUS-CONSTANT ticks) 0 ticks))]
+                                     (if (<= TURN-CONSTANT ticks) 0 ticks))] ; reset ticks  
           
                 ; otherwise continue movement  
-                [else (movement-handler struct 3 ticks current-heading new-heading new-player-position new-desired-heading speed)])])))
+                [else (cond [(>= ticks TURN-CONSTANT)
+                             (update-player-and-ticks struct 0 (make-player new-heading new-player-position speed new-desired-heading))]
+                            [else
+                             (update-player-and-ticks struct ticks (make-player current-heading new-player-position speed new-desired-heading))])])])))
+
+
+(define TURN-CONSTANT 2)    
 
 
 ; World State, Number, Player State -> World State
@@ -203,14 +223,6 @@
 
 
 ;******************************************************* AHHHHHHH *******************************************************
-
-
-; Number, Number, Number, Number, Number 
-; handles movement shit fuck 
-(define (movement-handler struct tick-limit ticks current-heading new-heading new-player-position new-desired-heading speed)
-  (cond [(<= tick-limit ticks)
-         (update-player-and-ticks struct 0 (make-player new-heading new-player-position speed new-desired-heading))]
-        [else (update-player-and-ticks struct ticks (make-player current-heading new-player-position speed new-desired-heading))]))
 
 
 ; Number, Number, Number -> Number
@@ -300,13 +312,13 @@
           [(equal? current-heading NW) (make-posn (- x diagonal-speed) (- y diagonal-speed))]
           [(equal? current-heading SE) (make-posn (+ x diagonal-speed) (+ y diagonal-speed))]
           [(equal? current-heading SW) (make-posn (- x diagonal-speed) (+ y diagonal-speed))]
-          [else (print "bitchbitchbitch")]))) 
+          [else (print "uh oh")]))) 
 
 
 ; Number, Number -> Number
 ; returns the given percentage of a number 
 (define (percentage percent number)
-  (* (/ percent 10) (/ number 10)))
+  (* (/ percent 10) (/ number 10))) 
 
 
 
@@ -364,15 +376,16 @@
           (define save-box (level-state-save-box (world-state-level struct)))
           (define gaming? (level-state-running? (world-state-level struct)))
           (define menu-status (menu-open? (world-state-menu struct)))
-          (define start-button (menu-button (world-state-menu struct))) 
+          (define start-button (first (menu-button-list (world-state-menu struct)))) 
           
           ; IMAGES ------------------------------------------------------------------------------------------------------
-          (define start-button-img (rectangle (hit-box-width start-button) (hit-box-height start-button) 'outline 'white))
-          (define player-image (circle PLAYER-HITBOX 'solid 'gray))  ; (* PLAYER-HITBOX (sqrt 2)) 
-          (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'black))  
+          (define start-button-img (rectangle (button-width start-button) (button-height start-button) 'solid 'gray))
+          (define player-image (overlay  (circle PLAYER-HITBOX 90 'orange) (circle 20 20 'red)))  ; (* PLAYER-HITBOX (sqrt 2))  
+          (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'black))
+          (define start-background (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'dimgray))   
           (define end-box-image (rectangle (hit-box-width end-box) (hit-box-height end-box) 40 'gold))
           (define save-box-image (rectangle (hit-box-width save-box) (hit-box-height save-box) 30 'green))
-          (define TITLE-SCREEN (place-image (overlay (text "EMBARK" 18 'white) start-button-img) (hit-box-x start-button) (hit-box-y start-button) background))
+          (define TITLE-SCREEN (place-image (overlay (text "START" 18 'black) start-button-img) (button-x start-button) (button-y start-button) start-background))
           (define GAMING-SCREEN (place-image player-image x y (place-images (list end-box-image save-box-image)
                                                                             (list (make-posn (hit-box-x end-box) (hit-box-y end-box))
                                                                                   (make-posn (hit-box-x save-box) (hit-box-y save-box)))
@@ -380,7 +393,7 @@
     ; DRAW -------------------------------------------------------------------------------------------------------------- 
     (place-image (debugger struct)
                  80 100
-                 (if (false? gaming?) TITLE-SCREEN GAMING-SCREEN))))  
+                 (if (false? gaming?) TITLE-SCREEN GAMING-SCREEN))))     
 
 
 ; List of Hit-Boxes, Image -> Image
@@ -398,7 +411,7 @@
 ; List of Hit-Boxes -> List of Rectangles   
 ; generates a list of rectangles based upon the list of hit-boxes 
 (define (generate-rectangles hit-boxes)
-  (map (lambda (hit-box) (rectangle (hit-box-width hit-box) (hit-box-height hit-box) "solid" "darkgray")) hit-boxes))
+  (map (lambda (hit-box) (rectangle (hit-box-width hit-box) (hit-box-height hit-box) "solid" "dim gray")) hit-boxes))
 
 ;======================================================== |Debugger| ===================================================
 
@@ -463,7 +476,7 @@
         (make-hit-box 50 130 500 360)
         (make-hit-box 50 130 400 435)
         (make-hit-box 50 130 300 360)
-        (make-hit-box 75 115 180 380)
+        (make-hit-box 75 115 180 380) 
         
         (make-hit-box 270 30 360 186)
         (make-hit-box 230 26 360 160)
@@ -499,11 +512,18 @@
   
 (define initial-keys (make-keys #f #f #f #f))
 
-(define initial-menu (make-menu (make-hit-box 80 40 500 250) #true))
 
-(define initial-world-state (make-world-state initial-player initial-keys level0 initial-menu 0))  
+; ------------------------ TITLE MENU ---------------------------
+
+
+
+
+(define initial-world-state (make-world-state initial-player initial-keys level0 title-menu 0))  
 
 ;======================================================= |THE BIG-BANG| ==================================================
+
+(define (last-scene struct)
+  (overlay (above (text "You have won." 50 'GREEN) (text " Congragulations? v( ‘.’ )v" 50 'GREEN)) (rectangle 1000 500 'solid 'dimgray)))
 
 (big-bang initial-world-state  
   (on-tick tock)  
@@ -511,8 +531,9 @@
   (on-mouse mouse-handler)
   (name "walmart celeste") 
   (state #f)
+ ; (stop-when  ender last-scene)
   (on-key press-handler)
-  (on-release release-handler)) 
+  (on-release release-handler))  
 
 #| TO DO
 
