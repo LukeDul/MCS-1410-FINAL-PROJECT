@@ -39,7 +39,7 @@
 (define SOUTH 5)
 (define SW 6)
 (define WEST 7)
-(define NW 8)
+(define NW 8) 
  
 ;******************************************************* MOUSE-HANDLING *******************************************************
 
@@ -151,7 +151,7 @@
          [(key=? input-key "a") (update-keys struct (make-keys w #f s d))]
          [(key=? input-key "s") (update-keys struct (make-keys w a #f d))]   
          [(key=? input-key "d") (update-keys struct (make-keys w a s #f))]
-        [(key=? input-key "escape") (toggle-gameplay/menu struct #false #true )] ; open menu 
+        [(key=? input-key "escape") (toggle-gameplay/menu struct #false #true )] ; open menu  
          [else struct]))) 
 
 
@@ -177,7 +177,7 @@
 ; World State -> World State 
 ; updates heading and position of the player  
 (define (tock struct) 
-
+ 
          ; shorthand 
  (local [(define keyboard-state (world-state-keyboard struct))
          
@@ -295,7 +295,7 @@
 
 
 ; Number, Number, Number -> Number 
-; Counts the number of left turns required to reach a desried heading.
+; Counts the number of left turns required to reach a desired heading.
 (define (count-left-turns current-heading desired-heading max-heading min-heading)
   (cond [(= current-heading desired-heading) 0]
         [else (+ 1 (count-left-turns (turn-left current-heading max-heading min-heading)
@@ -572,9 +572,9 @@
 
 (define level1-end-box (make-hit-box 190 60 895 40))  
 
-(define level1-save-box (make-hit-box 100 45 150 300))
+(define level1-save-box (make-hit-box 100 45 150 300)) 
 
-(define level1-start-posn (make-posn 950 450)) 
+(define level1-start-posn (make-posn 950 450))  
 
 (define level1 (make-level-state level1-hit-boxes level1-start-posn level1-end-box level1-save-box #false))
 
@@ -582,10 +582,11 @@
 (define level2-hit-boxes
   (list (make-hit-box 25 500 0 250) 
         (make-hit-box 800 25 400 0)  
-        (make-hit-box 25 25 300 300)     
+        (make-hit-box 25 25 300 300)
+        (make-hit-box 50 200 900 400)
         ))
 
-(define level2-end-box (make-hit-box 190 60 895 40))  
+(define level2-end-box (make-hit-box 190 60 895 40))   
 
 (define level2-save-box (make-hit-box 100 45 150 300))
 
@@ -628,12 +629,12 @@
   (on-tick tock)  
   (to-draw draw)
   (on-mouse mouse-handler)
-  (name "walmart celeste") 
+  (name "walmart celeste")  
   (state #f)
  ; (stop-when  ender last-scene)
   (on-key press-handler)
-  (on-release release-handler))  
-
+  (on-release release-handler))   
+ 
 #| TO DO
 
 ONLY STARAT MOVING ONCE A KEY IS PRESSED 
