@@ -8,7 +8,10 @@
 (define WINDOW-HEIGHT 500)
 
 ; size of the player's hitbox 
-(define PLAYER-HITBOX 7)
+(define PLAYER-HITBOX 7) 
+
+; tiucks 
+(define TURN-RADIUS-CONSTANT 4)
 
 ; player contains the heading, position & speed of the player character.
 (define-struct player [heading position speed desired-heading]) 
@@ -20,11 +23,14 @@
 (define-struct hit-box [width height x y])
 
 ;
-(define-struct menu [buttons])
+(define-struct menu [button open?])
 
-(define-struct level [hit-boxes start-position end-hitbox])
+; List, Posn, hit-box, hit-box 
+(define-struct level-state [hit-boxes start-posn end-box save-box running?])
+
 ; worldstate 
-(define-struct world-state [player keyboard level ticks])
+(define-struct world-state [player keyboard level menu ticks])
+
 
 (define NORTH 1)
 (define NE 2)
@@ -33,7 +39,7 @@
 (define SOUTH 5)
 (define SW 6)
 (define WEST 7)
-(define NW 8)
+(define NW 8)  
 
 ;(define-struct world-state [menu game-play])
 
@@ -57,7 +63,7 @@ Menus
  - Level Selector Menu
    - Level 1
    - Level 2
-   - Level 3 (Only Accessible if 2 is beaten etc)
+   - Level 3
  
  - Escape Menu
    - Exit -> Title
@@ -69,12 +75,6 @@ Menus
 Save State
   - Holds Last Save Point
   - Completed Levels 
-
-Level State 
-  - Save Point Hit-box Position
-  - Start Position
-  - End Hit-box position
-
 
 
 |#
@@ -120,27 +120,75 @@ Level State
   (make-world-state (world-state-player struct)
                     new-keys
                     (world-state-level struct)
+                    (world-state-menu struct)
+                    (world-state-ticks struct)))
+
+;******************************************************* MOUSE-HANDLING *******************************************************
+
+(define-struct button [posn width height pointer]) 
+
+; World-State, Number, Number, Mouse-Event -> World-State
+(define (mouse-handler struct mouse-x mouse-y mouse-event)
+  (local [(define button (menu-button (world-state-menu struct)))]
+    
+    (cond [(false? (and (point-collision? (make-posn mouse-x mouse-y) button) (mouse=? mouse-event "button-down"))) struct]
+          [else (toggle-gameplay/menu struct #true #false)])))
+
+
+;******************************************************* MENU-HANDLING *******************************************************
+
+
+; World-State, Boolean, Boolean -> World-State
+; start/stops gameplay and opens/closes menu 
+(define (toggle-gameplay/menu struct gameplay-toggle menu-toggle)
+  (make-world-state (world-state-player struct)
+                    (world-state-keyboard struct)
+                    (toggle-gameplay (world-state-level struct) gameplay-toggle)
+                    (toggle-menu (world-state-menu struct) menu-toggle)
                     (world-state-ticks struct)))
 
 
-;******************************************************* on-tick / movement *******************************************************
+; Menu, Boolean -> Menu
+; opens or closes a menu  
+(define (toggle-menu struct open/close)
+  (make-menu (menu-button struct)
+             open/close))
 
+
+; Level-State, Boolean -> Level-State
+; starts or stops gameplay
+(define (toggle-gameplay struct start/stop)
+  (make-level-state (level-state-hit-boxes struct)
+                    (level-state-start-posn struct)
+                    (level-state-end-box struct) 
+                    (level-state-save-box struct)
+                    start/stop))
+
+
+;******************************************************* TOCK *******************************************************
 
 
 ; World State -> World State 
-; updates heading and position of the player 
+; updates heading and position of the player  
 (define (tock struct)
 
          ; shorthand 
  (local [(define keyboard-state (world-state-keyboard struct))
+         
          (define current-heading (player-heading (world-state-player struct)))
          (define current-desired-heading (player-desired-heading (world-state-player struct)))
          (define current-player-position (player-position (world-state-player struct)))
          (define speed (player-speed (world-state-player struct)))
+         
          (define hit-boxes (level-state-hit-boxes (world-state-level struct)))
          (define end-box (level-state-end-box (world-state-level struct)))
          (define save-box (level-state-save-box (world-state-level struct)))
          (define start-posn (level-state-start-posn (world-state-level struct)))
+         (define running? (level-state-running? (world-state-level struct)))
+         
+         (define button (menu-button (world-state-menu struct)))
+         (define open? (menu-open? (world-state-menu struct)))
+ 
 
          ; increments ticks 
          (define ticks (+ 1 (world-state-ticks struct)))
@@ -154,27 +202,30 @@ Level State
          ; Changes the players position based upon the current heading, position and speed.
          (define new-player-position (change-position current-heading current-player-position speed))]
 
+ 
+   (cond [(false? running?) struct]
+         
+         ;*************************************** Game-play ********************************************
+         
+               ; if player is colliding w/ a hitbox move player to start coordinates 
+         [else (cond [(colliding? current-player-position PLAYER-HITBOX hit-boxes)
+                      (update-player-and-ticks struct ticks (make-player NORTH start-posn speed NORTH))]
 
-    
-         ; if player is colliding w/ a hitbox move player to start coordinates 
-   (cond [(colliding? current-player-position PLAYER-HITBOX hit-boxes)
-          (update-player-and-ticks struct ticks (make-player NORTH start-posn speed NORTH))]
+                ; if player is colliding w/ the end box open level select
+                [(colliding? current-player-position PLAYER-HITBOX (list end-box))
+                 (update-player-and-ticks struct ticks (make-player current-heading current-player-position speed current-heading))]
 
-         ; if player is colliding w/ the end box open level select
-         [(colliding? current-player-position PLAYER-HITBOX (list end-box))
-          (update-player-and-ticks struct ticks (make-player current-heading current-player-position speed current-heading))]
-
-         ; if player is colliding w/ the save box set start coordinates to save-box coordinates 
-         [(colliding? current-player-position PLAYER-HITBOX (list save-box))
+                ; if player is colliding w/ the save box set start coordinates to save-box coordinates 
+                [(colliding? current-player-position PLAYER-HITBOX (list save-box))
+                 (make-world-state   (cond [(<= TURN-RADIUS-CONSTANT ticks) (make-player new-heading new-player-position speed new-desired-heading)]
+                                           [else (make-player current-heading new-player-position speed new-desired-heading)])
+                                     (world-state-keyboard struct)
+                                     (make-level-state hit-boxes (make-posn (hit-box-x save-box) (hit-box-y save-box)) end-box save-box running?)
+                                     (world-state-menu struct)
+                                     (if (<= TURN-RADIUS-CONSTANT ticks) 0 ticks))]
           
-          (make-world-state   (cond [(<= 3 ticks) (make-player new-heading new-player-position speed new-desired-heading)]
-                                    [else (make-player current-heading new-player-position speed new-desired-heading)])
-                              (world-state-keyboard struct)
-                              (make-level-state hit-boxes (make-posn (hit-box-x save-box) (hit-box-y save-box)) end-box save-box)
-                              (if (<= 3 ticks) 0 ticks))]
-          
-         ; otherwise continue movement  
-         [else (movement-handler struct 3 ticks current-heading new-heading new-player-position new-desired-heading speed)])))
+                ; otherwise continue movement  
+                [else (movement-handler struct 3 ticks current-heading new-heading new-player-position new-desired-heading speed)])])))
 
 
 ; World State, Number, Player State -> World State
@@ -183,15 +234,12 @@ Level State
   (make-world-state new-player-state
                     (world-state-keyboard struct)
                     (world-state-level struct)
+                    (world-state-menu struct)
                     ticks))
 
 
+;******************************************************* AHHHHHHH *******************************************************
 
-;(define (update-player-ticks-and-start-posn struct ticks new-level-state new-player-state)
-;  (make-world-state new-player-state
-;                    (world-state-keyboard struct) 
- ;                   new-level-state
- ;                   ticks))
 
 ; Number, Number, Number, Number, Number 
 ; handles movement shit fuck 
@@ -220,7 +268,7 @@ Level State
     
     (cond [(and w d) NE]
           [(and d s) SE] 
-          [(and s a) SW]
+          [(and s a) SW] 
           [(and a w) NW]  
           [w NORTH]
           [a WEST]
@@ -298,7 +346,7 @@ Level State
   (* (/ percent 10) (/ number 10)))
 
 
-;**************************************************** collision ****************************************************
+;**************************************************** collision helpers ****************************************************
 
 
 ; List of hit-boxes, Posn, Number  -> Boolean
@@ -340,8 +388,7 @@ Level State
 
 ;******************************************************* rendering ****************************************************
 
-; List, Posn, hit-box, hit-box 
-(define-struct level-state [hit-boxes start-posn end-box save-box])
+
 
 ; World State -> Image
 ; Given the Player Structure, struct, returns an image of the playerable character at the Player Structure's coordinates. 
@@ -362,7 +409,7 @@ Level State
     (place-image (debugger struct)
                  80 100 
                  (place-image player-image
-                              x y
+                              x y 
                               (place-images (list end-box-image save-box-image)
                                             (list (make-posn (hit-box-x end-box) (hit-box-y end-box))
                                                   (make-posn (hit-box-x save-box) (hit-box-y save-box)))
@@ -433,10 +480,12 @@ Level State
         (make-hit-box 800 100 600 250)))
   
 ;contains each hit-box  
-(define level1
+(define level1-hit-boxes
   (list (make-hit-box 25 500 0 250) ; width height x y 
         (make-hit-box 800 25 400 0)  
-        (make-hit-box 25 25 300 300)))  
+        (make-hit-box 25 25 300 300)))
+
+
  
 
 (define level0-end-box (make-hit-box 80 40 900 40)) 
@@ -445,23 +494,28 @@ Level State
 
 (define level0-start-posn (make-posn 950 450))
 
-(define level0 (make-level-state level0-hit-boxes level0-start-posn level0-end-box level0-save-box))
+(define level0 (make-level-state level0-hit-boxes level0-start-posn level0-end-box level0-save-box #false))
+
+
 
 ; the initial state of the playable character. 
 (define initial-player (make-player WEST
                                     level0-start-posn; aligns player on 90% of y-axis
                                     8  
                                     WEST)) ; initial speed
- 
-(define initial-keys (make-keys #f #f #f #f))    
+  
+(define initial-keys (make-keys #f #f #f #f))
 
-(define initial-world-state (make-world-state initial-player initial-keys level0 0)) 
+(define initial-menu (make-menu (make-hit-box 80 40 500 250) #true))
+
+(define initial-world-state (make-world-state initial-player initial-keys level0 initial-menu 0))  
 
 ; ******************************************************* big bang ***********************************************
 
 (big-bang initial-world-state  
   (on-tick tock)  
   (to-draw draw)
+  (on-mouse mouse-handler)
   (name "walmart celeste") 
   (state #f)
   (on-key press-handler)
