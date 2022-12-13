@@ -24,7 +24,7 @@
 ; open? is a boolean
 (define-struct menu [button-list open?])
 
-(define-struct button [width height x y action])
+(define-struct button [width height x y])
 
 ; List, Posn, hit-box, hit-box 
 (define-struct level-state [hit-boxes start-posn end-box save-box running?])
@@ -40,25 +40,85 @@
 (define SW 6)
 (define WEST 7)
 (define NW 8)
-
+ 
 ;******************************************************* MOUSE-HANDLING *******************************************************
 
-(define start-button (make-button 100 60 500 250 "start" (toggle-gameplay/menu struct #true #false)))
-
-(define level-1-button (make-button "level1 button" 100 60 500 180))
-
-(define title-menu-buttons (list start-button level-1-button)) 
-
-(define title-menu (make-menu title-menu buttons #true))
 
 ; World-State, Number, Number, Mouse-Event -> World-State
 (define (mouse-handler struct mouse-x mouse-y mouse-event)
-  (local [(define button (first (menu-button-list (world-state-menu struct))))
-          (define action (button-action (first (menu-button-list)] 
+  (local [(define start-button (first (menu-button-list (world-state-menu struct))))
+          (define level0-button (second (menu-button-list (world-state-menu struct))))
+          (define level1-button (third (menu-button-list (world-state-menu struct))))
+          (define level2-button (fourth (menu-button-list (world-state-menu struct))))
+          (define start-posn (level-state-start-posn (world-state-level struct)))
+          (define speed (player-speed (world-state-player struct)))] 
     
-    (cond [(and (point-collision? (make-posn mouse-x mouse-y) button) (mouse=? mouse-event "button-down")) ]
+    (cond [(and (point-button-collision? (make-posn mouse-x mouse-y) start-button)
+                (mouse=? mouse-event "button-down"))
+           (toggle-gameplay/menu struct #true #false)]  
+
+          ;
+          [(and (point-button-collision? (make-posn mouse-x mouse-y) level0-button)
+                (mouse=? mouse-event "button-down"))
+           (toggle-gameplay/menu (switch-level (update-player-and-ticks struct (world-state-ticks struct) (make-player NORTH start-posn speed NORTH)) level0) #true #false)]
+          
+          [(and (point-button-collision? (make-posn mouse-x mouse-y) level1-button)
+                (mouse=? mouse-event "button-down"))
+           (toggle-gameplay/menu (switch-level (update-player-and-ticks struct (world-state-ticks struct) (make-player NORTH start-posn speed NORTH)) level1) #true #false)]
+
+          [(and (point-button-collision? (make-posn mouse-x mouse-y) level2-button)
+                (mouse=? mouse-event "button-down"))
+           (toggle-gameplay/menu (switch-level (update-player-and-ticks struct (world-state-ticks struct) (make-player NORTH start-posn speed NORTH)) level2) #true #false)] 
           [else struct])))
 
+
+;******************************************************* MENU-HANDLING *******************************************************
+
+(define (switch-level struct level)
+  (make-world-state (world-state-player struct)
+                    (world-state-keyboard struct)
+                    level
+                    (world-state-menu struct)
+                    (world-state-ticks struct))) 
+
+
+; World-State, Boolean, Boolean -> World-State
+; start/stops gameplay and opens/closes menu 
+(define (toggle-gameplay/menu struct gameplay-toggle menu-toggle)
+  (make-world-state (world-state-player struct)
+                    (world-state-keyboard struct)
+                    (toggle-gameplay (world-state-level struct) gameplay-toggle)
+                    (toggle-menu (world-state-menu struct) menu-toggle) 
+                    (world-state-ticks struct))) 
+
+
+; Menu, Boolean -> Menu
+; opens or closes a menu  
+(define (toggle-menu struct open/close)
+  (make-menu (menu-button-list struct)
+             open/close))
+
+
+; Level-State, Boolean -> Level-State
+; starts or stops gameplay
+(define (toggle-gameplay struct start/stop)
+  (make-level-state (level-state-hit-boxes struct)
+                    (level-state-start-posn struct)
+                    (level-state-end-box struct) 
+                    (level-state-save-box struct)
+                    start/stop))
+
+
+; Posn, Button, -> Boolean
+; Given a point and a button returns whether button contains the point using inequalities 
+(define (point-button-collision? point button)
+  (if (and
+       (<= (posn-x point) (+ (button-x button) (/ (button-width button) 2)))
+       (>= (posn-x point) (- (button-x button) (/ (button-width button) 2)))
+       (<= (posn-y point) (+ (button-y button) (/ (button-height button) 2)))
+       (>= (posn-y point) (- (button-y button) (/ (button-height button) 2))))
+      #t 
+      #f))  
 
 ;******************************************************* keyboard handling *******************************************************
 
@@ -105,34 +165,6 @@
                     (world-state-ticks struct)))
 
 
-;******************************************************* MENU-HANDLING *******************************************************
-
-
-; World-State, Boolean, Boolean -> World-State
-; start/stops gameplay and opens/closes menu 
-(define (toggle-gameplay/menu struct gameplay-toggle menu-toggle)
-  (make-world-state (world-state-player struct)
-                    (world-state-keyboard struct)
-                    (toggle-gameplay (world-state-level struct) gameplay-toggle)
-                    (toggle-menu (world-state-menu struct) menu-toggle)
-                    (world-state-ticks struct))) 
-
-
-; Menu, Boolean -> Menu
-; opens or closes a menu  
-(define (toggle-menu struct open/close)
-  (make-menu (menu-button-list struct)
-             open/close))
-
-
-; Level-State, Boolean -> Level-State
-; starts or stops gameplay
-(define (toggle-gameplay struct start/stop)
-  (make-level-state (level-state-hit-boxes struct)
-                    (level-state-start-posn struct)
-                    (level-state-end-box struct) 
-                    (level-state-save-box struct)
-                    start/stop))
 
 
 ;******************************************************* TOCK *******************************************************
@@ -187,7 +219,8 @@
 
                 ; if player is colliding w/ the end box open level select
                 [(colliding? current-player-position PLAYER-HITBOX (list end-box))
-                 (toggle-gameplay/menu struct #false #true )]
+                 (toggle-gameplay/menu (update-player-and-ticks struct ticks (make-player NORTH start-posn speed NORTH)) #false #true )]
+                
                  ;(update-player-and-ticks struct ticks (make-player current-heading current-player-position speed current-heading))]
 
                 ; if player is colliding w/ the save box set start coordinates to save-box coordinates & continue movement 
@@ -376,16 +409,48 @@
           (define save-box (level-state-save-box (world-state-level struct)))
           (define gaming? (level-state-running? (world-state-level struct)))
           (define menu-status (menu-open? (world-state-menu struct)))
-          (define start-button (first (menu-button-list (world-state-menu struct)))) 
+
+          ;buttons
+         (define start-button (first (menu-button-list (world-state-menu struct))))
+          (define level0-button (second (menu-button-list (world-state-menu struct))))
+          (define level1-button (third (menu-button-list (world-state-menu struct))))
+          (define level2-button (fourth (menu-button-list (world-state-menu struct))))
           
           ; IMAGES ------------------------------------------------------------------------------------------------------
-          (define start-button-img (rectangle (button-width start-button) (button-height start-button) 'solid 'gray))
+          (define start-button-img (overlay 
+                                    (text "START" 18 'black)
+                                    (rectangle (button-width start-button) (button-height start-button) 'solid 'gray)))
+
+          (define level0-button-img (overlay
+                                       (text "LEVEL 1" 18 'black)
+                                       (rectangle (button-width level0-button) (button-height level0-button) 'solid 'darkgray)))
+            
+          (define level1-button-img (overlay
+                                       (text "LEVEL 2" 18 'black)
+                                       (rectangle (button-width level1-button) (button-height level1-button) 'solid 'darkgray)))
+            
+          (define level2-button-img (overlay 
+                                       (text "LEVEL 3" 18 'black)
+                                       (rectangle (button-width level2-button) (button-height level2-button) 'solid 'darkgray)))
+          
+          
           (define player-image (overlay  (circle PLAYER-HITBOX 90 'orange) (circle 20 20 'red)))  ; (* PLAYER-HITBOX (sqrt 2))  
           (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'black))
-          (define start-background (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'dimgray))   
+          (define title (text "WALMART CELESTE" 40 'black))
+          (define start-background (place-image title 500 150 (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'dimgray)))
           (define end-box-image (rectangle (hit-box-width end-box) (hit-box-height end-box) 40 'gold))
           (define save-box-image (rectangle (hit-box-width save-box) (hit-box-height save-box) 30 'green))
-          (define TITLE-SCREEN (place-image (overlay (text "START" 18 'black) start-button-img) (button-x start-button) (button-y start-button) start-background))
+          (define TITLE-SCREEN (place-images (list start-button-img
+                                                   level0-button-img
+                                                   level1-button-img
+                                                   level2-button-img)
+                                             
+                                             (list (make-posn (button-x start-button) (button-y start-button))
+                                                   (make-posn (button-x level0-button) (button-y level0-button))
+                                                   (make-posn (button-x level1-button) (button-y level1-button))
+                                                   (make-posn (button-x level2-button) (button-y level2-button)))
+                                             start-background))
+          
           (define GAMING-SCREEN (place-image player-image x y (place-images (list end-box-image save-box-image)
                                                                             (list (make-posn (hit-box-x end-box) (hit-box-y end-box))
                                                                                   (make-posn (hit-box-x save-box) (hit-box-y save-box)))
@@ -393,7 +458,8 @@
     ; DRAW -------------------------------------------------------------------------------------------------------------- 
     (place-image (debugger struct)
                  80 100
-                 (if (false? gaming?) TITLE-SCREEN GAMING-SCREEN))))     
+                 (if (false? gaming?) TITLE-SCREEN GAMING-SCREEN))))
+
 
 
 ; List of Hit-Boxes, Image -> Image
@@ -489,13 +555,7 @@
         (make-hit-box 20 500 1000 250)
         (make-hit-box 500 20 900 0)))    
   
-;contains each hit-box  
-(define level1-hit-boxes
-  (list (make-hit-box 25 500 0 250) 
-        (make-hit-box 800 25 400 0)  
-        (make-hit-box 25 25 300 300)   
-        ))
- 
+
 (define level0-end-box (make-hit-box 190 60 895 40))  
 
 (define level0-save-box (make-hit-box 100 45 150 300))
@@ -504,9 +564,38 @@
 
 (define level0 (make-level-state level0-hit-boxes level0-start-posn level0-end-box level0-save-box #false))
 
+;contains each hit-box  
+(define level1-hit-boxes
+  (list (make-hit-box 25 500 0 250) 
+        (make-hit-box 800 25 400 0)  
+        (make-hit-box 25 25 300 300)))
+
+(define level1-end-box (make-hit-box 190 60 895 40))  
+
+(define level1-save-box (make-hit-box 100 45 150 300))
+
+(define level1-start-posn (make-posn 950 450)) 
+
+(define level1 (make-level-state level1-hit-boxes level1-start-posn level1-end-box level1-save-box #false))
+
+;contains each hit-box  
+(define level2-hit-boxes
+  (list (make-hit-box 25 500 0 250) 
+        (make-hit-box 800 25 400 0)  
+        (make-hit-box 25 25 300 300)     
+        ))
+
+(define level2-end-box (make-hit-box 190 60 895 40))  
+
+(define level2-save-box (make-hit-box 100 45 150 300))
+
+(define level2-start-posn (make-posn 950 450)) 
+
+(define level2 (make-level-state level2-hit-boxes level2-start-posn level2-end-box level2-save-box #false))
+
 ; the initial state of the playable character. 
 (define initial-player (make-player WEST
-                                    level0-start-posn; aligns player on 90% of y-axis
+                                    level0-start-posn
                                     8  
                                     WEST)) ; initial speed
   
@@ -515,15 +604,25 @@
 
 ; ------------------------ TITLE MENU ---------------------------
 
+(define start-button (make-button 100 60 500 250))  
 
+(define level-0-button (make-button 100 60 380 320)) 
+
+(define level-1-button (make-button 100 60 500 320))
+
+(define level-2-button (make-button 100 60 620 320)) 
+
+(define title-menu-buttons (list start-button level-0-button level-1-button level-2-button)) 
+
+(define title-menu (make-menu title-menu-buttons #true)) 
 
 
 (define initial-world-state (make-world-state initial-player initial-keys level0 title-menu 0))  
 
 ;======================================================= |THE BIG-BANG| ==================================================
 
-(define (last-scene struct)
-  (overlay (above (text "You have won." 50 'GREEN) (text " Congragulations? v( ‘.’ )v" 50 'GREEN)) (rectangle 1000 500 'solid 'dimgray)))
+;(define (last-scene struct)
+ ; (overlay (above (text "You have won." 50 'GREEN) (text " Congragulations v( ‘.’ )v" 50 'GREEN)) (rectangle 1000 500 'solid 'dimgray)))
 
 (big-bang initial-world-state  
   (on-tick tock)  
