@@ -1,6 +1,8 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
 #reader(lib "htdp-advanced-reader.ss" "lang")((modname main) (read-case-sensitive #t) (teachpacks ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp"))) (htdp-settings #(#t constructor repeating-decimal #t #t none #f ((lib "image.rkt" "teachpack" "2htdp") (lib "universe.rkt" "teachpack" "2htdp")) #f)))
+(require racket/format)
+
 ; the width of the game window 
 (define WINDOW-WIDTH 1000)
 
@@ -31,7 +33,6 @@
 ; worldstate 
 (define-struct world-state [player keyboard level menu ticks])
 
-
 (define NORTH 1)
 (define NE 2)
 (define EAST 3)
@@ -41,45 +42,6 @@
 (define WEST 7)
 (define NW 8)  
 
-;(define-struct world-state [menu game-play])
-
-;(define-struct game-play [player keyboard hit-box]) 
-
-; buttons is a list of all buttons on given screen
-; screen is the current screen
-; (define-struct menu [screen buttons]
-
-
-#| TO DO
-
-
-
-Menus
- - Title Menu
-   - Start Button -> Level 1
-   - Continue Button -> Last Save Point 
-   - Level Select Button
- 
- - Level Selector Menu
-   - Level 1
-   - Level 2
-   - Level 3
- 
- - Escape Menu
-   - Exit -> Title
-   - Exit -> Level Select
- 
- - Win Screen / Credits 
-
-
-Save State
-  - Holds Last Save Point
-  - Completed Levels 
-
-
-|#
-  
- 
 
 ;******************************************************* keyboard handling *******************************************************
 
@@ -123,7 +85,9 @@ Save State
                     (world-state-menu struct)
                     (world-state-ticks struct)))
 
+
 ;******************************************************* MOUSE-HANDLING *******************************************************
+
 
 (define-struct button [posn width height pointer]) 
 
@@ -145,7 +109,7 @@ Save State
                     (world-state-keyboard struct)
                     (toggle-gameplay (world-state-level struct) gameplay-toggle)
                     (toggle-menu (world-state-menu struct) menu-toggle)
-                    (world-state-ticks struct)))
+                    (world-state-ticks struct))) 
 
 
 ; Menu, Boolean -> Menu
@@ -170,7 +134,7 @@ Save State
 
 ; World State -> World State 
 ; updates heading and position of the player  
-(define (tock struct)
+(define (tock struct) 
 
          ; shorthand 
  (local [(define keyboard-state (world-state-keyboard struct))
@@ -209,7 +173,7 @@ Save State
          
                ; if player is colliding w/ a hitbox move player to start coordinates 
          [else (cond [(colliding? current-player-position PLAYER-HITBOX hit-boxes)
-                      (update-player-and-ticks struct ticks (make-player NORTH start-posn speed NORTH))]
+                      (update-player-and-ticks struct ticks (make-player NORTH start-posn speed NORTH))] 
 
                 ; if player is colliding w/ the end box open level select
                 [(colliding? current-player-position PLAYER-HITBOX (list end-box))
@@ -247,7 +211,6 @@ Save State
   (cond [(<= tick-limit ticks)
          (update-player-and-ticks struct 0 (make-player new-heading new-player-position speed new-desired-heading))]
         [else (update-player-and-ticks struct ticks (make-player current-heading new-player-position speed new-desired-heading))]))
-
 
 
 ; Number, Number, Number -> Number
@@ -346,8 +309,8 @@ Save State
   (* (/ percent 10) (/ number 10)))
 
 
-;**************************************************** collision helpers ****************************************************
 
+;======================================================== |COLLISION HELPERS| ============================================
 
 ; List of hit-boxes, Posn, Number  -> Boolean
 ; checks if a square surrounding a point with width & height size is colliding w/ any hit-box in a list, hit-boxes
@@ -386,47 +349,58 @@ Save State
       #t 
       #f))    
 
-;******************************************************* rendering ****************************************************
+;========================================================================================================================
+;======================================================== |RENDERING| ===================================================
+;========================================================================================================================
 
-
-
-; World State -> Image
+; World-State -> Image
 ; Given the Player Structure, struct, returns an image of the playerable character at the Player Structure's coordinates. 
 (define (draw struct)
+         ; SHORT-HAND ---------------------------------------------------------------------------------------------------
   (local [(define x (posn-x (player-position (world-state-player struct)))) 
           (define y (posn-y (player-position (world-state-player struct))))
-          (define player-image (square (* 2 PLAYER-HITBOX) "solid" "red"))  ; (* PLAYER-HITBOX (sqrt 2))
-          (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT "solid" 'gray))
           (define hit-boxes (level-state-hit-boxes (world-state-level struct)))
-          
           (define end-box (level-state-end-box (world-state-level struct)))
-          (define end-box-image (rectangle (hit-box-width end-box) (hit-box-height end-box) 'outline 'red))
-
-          
           (define save-box (level-state-save-box (world-state-level struct)))
-          (define save-box-image (rectangle (hit-box-width save-box) (hit-box-height save-box) 'outline 'green))] 
-    
+          (define gaming? (level-state-running? (world-state-level struct)))
+          (define menu-status (menu-open? (world-state-menu struct)))
+          (define start-button (menu-button (world-state-menu struct))) 
+          
+          ; IMAGES ------------------------------------------------------------------------------------------------------
+          (define start-button-img (rectangle (hit-box-width start-button) (hit-box-height start-button) 'outline 'white))
+          (define player-image (circle PLAYER-HITBOX 'solid 'gray))  ; (* PLAYER-HITBOX (sqrt 2)) 
+          (define background (rectangle WINDOW-WIDTH WINDOW-HEIGHT 'solid 'black))  
+          (define end-box-image (rectangle (hit-box-width end-box) (hit-box-height end-box) 40 'gold))
+          (define save-box-image (rectangle (hit-box-width save-box) (hit-box-height save-box) 30 'green))
+          (define TITLE-SCREEN (place-image (overlay (text "EMBARK" 18 'white) start-button-img) (hit-box-x start-button) (hit-box-y start-button) background))
+          (define GAMING-SCREEN (place-image player-image x y (place-images (list end-box-image save-box-image)
+                                                                            (list (make-posn (hit-box-x end-box) (hit-box-y end-box))
+                                                                                  (make-posn (hit-box-x save-box) (hit-box-y save-box)))
+                                                                            (draw-hit-boxes hit-boxes background))))]   
+    ; DRAW -------------------------------------------------------------------------------------------------------------- 
     (place-image (debugger struct)
-                 80 100 
-                 (place-image player-image
-                              x y 
-                              (place-images (list end-box-image save-box-image)
-                                            (list (make-posn (hit-box-x end-box) (hit-box-y end-box))
-                                                  (make-posn (hit-box-x save-box) (hit-box-y save-box)))
-                                            (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background)))))) ; final placement 
+                 80 100
+                 (if (false? gaming?) TITLE-SCREEN GAMING-SCREEN))))  
 
 
-; list of hit-boxes -> list of posns
+; List of Hit-Boxes, Image -> Image
+; places an image of each hit-box on a background image 
+(define (draw-hit-boxes hit-boxes background)
+  (place-images (generate-rectangles hit-boxes) (generate-posns hit-boxes) background))
+
+
+; List of Hit-Boxes -> List of Posns
 ; generates a list of posns based upon the list of hit-boxes
 (define (generate-posns hit-boxes)
   (map (lambda (hit-box) (make-posn (hit-box-x hit-box) (hit-box-y hit-box))) hit-boxes))
                     
                     
-; list of hit-boxes -> list of rectangles  
+; List of Hit-Boxes -> List of Rectangles   
 ; generates a list of rectangles based upon the list of hit-boxes 
 (define (generate-rectangles hit-boxes)
-  (map (lambda (hit-box) (rectangle (hit-box-width hit-box) (hit-box-height hit-box) 'solid 'blue)) hit-boxes))
+  (map (lambda (hit-box) (rectangle (hit-box-width hit-box) (hit-box-height hit-box) "solid" "darkgray")) hit-boxes))
 
+;======================================================== |Debugger| ===================================================
 
 ; World State -> Image
 ; displays various values from the World State for debugging 
@@ -439,7 +413,9 @@ Save State
           (define w (keys-w (world-state-keyboard struct)))  
           (define a (keys-a (world-state-keyboard struct)))
           (define s (keys-s (world-state-keyboard struct)))
-          (define d (keys-d (world-state-keyboard struct)))]
+          (define d (keys-d (world-state-keyboard struct)))
+          (define gameplay-status (level-state-running? (world-state-level struct)))
+          (define menu-status (menu-open? (world-state-menu struct)))]
     
     (above (text (if w "W: #T" "W: #F") 12 "red")
            (text (if a "A: #T" "A: #F") 12 "red") 
@@ -447,56 +423,73 @@ Save State
            (text (if d "D: #T" "D: #F") 12 "red") 
            (text (number->string x) 12 "orange")
            (text (number->string y) 12 "orange")
+           (text (if gameplay-status "gameplay running" "gameplay not running") 12 "green")
+           (text (if menu-status "menu open" "menu closed") 12 "yellow")
            
-           (text (cond [(= heading 1) "Current Heading: N"]
-                       [(= heading 2) "Current Heading: NE"]
-                       [(= heading 3) "Current Heading: E"]
-                       [(= heading 4) "Current Heading: SE"] 
-                       [(= heading 5) "Current Heading: S"]  
-                       [(= heading 6) "Current Heading: SW"]
-                       [(= heading 7) "Current Heading: W"]
-                       [(= heading 8) "Current Heading: NW"]) 12 "red")
+           (text (cond [(= heading NORTH) "Current Heading: NORTH"] 
+                       [(= heading NE) "Current Heading: NE"]
+                       [(= heading EAST) "Current Heading: EAST"]
+                       [(= heading SE) "Current Heading: SE"] 
+                       [(= heading SOUTH) "Current Heading: SOUTH"]  
+                       [(= heading SW) "Current Heading: SW"]
+                       [(= heading WEST) "Current Heading: WEST"]
+                       [(= heading NW) "Current Heading: NW"]) 12 "red")
            
-           (text (cond [(= desired-heading 1) "Desired Heading: N"]
-                       [(= desired-heading 2) "Desired Heading: NE"] 
-                       [(= desired-heading 3) "Desired Heading: E"]
-                       [(= desired-heading 4) "Desired Heading: SE"] 
-                       [(= desired-heading 5) "Desired Heading: S"]
-                       [(= desired-heading 6) "Desired Heading: SW"]
-                       [(= desired-heading 7) "Desired Heading: W"]
-                       [(= desired-heading 8) "Desired Heading: NW"]) 12 "yellow")
+           (text (cond [(= desired-heading NORTH) "Desired Heading: NORTH"]
+                       [(= desired-heading NE) "Desired Heading: NE"] 
+                       [(= desired-heading EAST) "Desired Heading: EAST"]
+                       [(= desired-heading SE) "Desired Heading: SE"] 
+                       [(= desired-heading SOUTH) "Desired Heading: SOUTH"]
+                       [(= desired-heading SW) "Desired Heading: SW"]
+                       [(= desired-heading WEST) "Desired Heading: WEST"]
+                       [(= desired-heading NW) "Desired Heading: NW"]) 12 "yellow")
            
-           (text (number->string ticks) 12 "green")))) 
+           (text (number->string ticks) 12 "green"))))  
 
-
-; ******************************************************* initial states ************************************************
+;========================================================================================================================
+;======================================================== |INITIAL STATES| ==============================================
+;========================================================================================================================
 
 (define empty-level
-  (list (make-hit-box 0 0 0 0)))
+  (list (make-hit-box 0 0 0 0))) 
 
 (define level0-hit-boxes
   (list (make-hit-box 100 500 50 250)
         (make-hit-box 800 100 400 50)    
-        (make-hit-box 800 100 600 250)))
+        (make-hit-box 800 100 600 250)
+        (make-hit-box 1000 40 500 490); width height x y 
+        
+        (make-hit-box 50 100 700 425)
+        (make-hit-box 50 130 500 360)
+        (make-hit-box 50 130 400 435)
+        (make-hit-box 50 130 300 360)
+        (make-hit-box 75 115 180 380)
+        
+        (make-hit-box 270 30 360 186)
+        (make-hit-box 230 26 360 160)
+        (make-hit-box 230 20 360 105)
+
+        (make-hit-box 270 30 660 110)
+        (make-hit-box 230 26 660 135)
+        (make-hit-box 230 20 660 195)
+
+        (make-hit-box 20 500 1000 250)
+        (make-hit-box 500 20 900 0)))    
   
 ;contains each hit-box  
 (define level1-hit-boxes
-  (list (make-hit-box 25 500 0 250) ; width height x y 
+  (list (make-hit-box 25 500 0 250) 
         (make-hit-box 800 25 400 0)  
-        (make-hit-box 25 25 300 300)))
-
-
+        (make-hit-box 25 25 300 300)   
+        ))
  
+(define level0-end-box (make-hit-box 190 60 895 40))  
 
-(define level0-end-box (make-hit-box 80 40 900 40)) 
+(define level0-save-box (make-hit-box 100 45 150 300))
 
-(define level0-save-box (make-hit-box 80 80 150 240))
-
-(define level0-start-posn (make-posn 950 450))
+(define level0-start-posn (make-posn 950 450)) 
 
 (define level0 (make-level-state level0-hit-boxes level0-start-posn level0-end-box level0-save-box #false))
-
-
 
 ; the initial state of the playable character. 
 (define initial-player (make-player WEST
@@ -510,7 +503,7 @@ Save State
 
 (define initial-world-state (make-world-state initial-player initial-keys level0 initial-menu 0))  
 
-; ******************************************************* big bang ***********************************************
+;======================================================= |THE BIG-BANG| ==================================================
 
 (big-bang initial-world-state  
   (on-tick tock)  
@@ -520,3 +513,35 @@ Save State
   (state #f)
   (on-key press-handler)
   (on-release release-handler)) 
+
+#| TO DO
+
+ONLY STARAT MOVING ONCE A KEY IS PRESSED 
+
+Menus
+ - Title Menu
+   - Start Button -> Level 1
+   - Continue Button -> Last Save Point  
+   - Level Select Button
+ 
+ - Level Selector Menu
+   - Level 1
+   - Level 2
+   - Level 3
+ 
+ - Escape Menu
+   - Exit -> Title
+   - Exit -> Level Select
+ 
+ - Win Screen / Credits 
+
+
+Save State
+  - Holds Last Save Point
+  - Completed Levels 
+
+LEVEL SELECT
+
+
+|#
+  
